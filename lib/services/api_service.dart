@@ -1,0 +1,292 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:developer' as developer;
+
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+
+import '../config/api_config.dart';
+import 'storage_service.dart';
+
+class ApiException implements Exception {
+  final String message;
+  final int? statusCode;
+  final dynamic data;
+
+  ApiException(this.message, {this.statusCode, this.data});
+
+  @override
+  String toString() => 'ApiException: $message (statusCode: $statusCode)';
+}
+
+class ApiService {
+  final StorageService _storageService;
+  int _maxRetries;
+
+  ApiService({
+    required StorageService storageService,
+    int maxRetries = 3,
+  })  : _storageService = storageService,
+        _maxRetries = maxRetries;
+
+  String? get _token => _storageService.getString('auth_token');
+
+  Map<String, String> get _headers => ApiConfig.buildHeaders(token: _token);
+
+  Future<Map<String, dynamic>> get(
+    String endpointKey, {
+    Map<String, String>? pathParams,
+    Map<String, String>? queryParams,
+  }) async {
+    return _request(
+      method: 'GET',
+      url: ApiConfig.buildUrl(endpointKey, pathParams: pathParams),
+      queryParams: queryParams,
+    );
+  }
+
+  Future<Map<String, dynamic>> post(
+    String endpointKey, {
+    Map<String, String>? pathParams,
+    Map<String, dynamic>? body,
+  }) async {
+    return _request(
+      method: 'POST',
+      url: ApiConfig.buildUrl(endpointKey, pathParams: pathParams),
+      body: body,
+    );
+  }
+
+  Future<Map<String, dynamic>> put(
+    String endpointKey, {
+    Map<String, String>? pathParams,
+    Map<String, dynamic>? body,
+  }) async {
+    return _request(
+      method: 'PUT',
+      url: ApiConfig.buildUrl(endpointKey, pathParams: pathParams),
+      body: body,
+    );
+  }
+
+  Future<Map<String, dynamic>> delete(
+    String endpointKey, {
+    Map<String, String>? pathParams,
+  }) async {
+    return _request(
+      method: 'DELETE',
+      url: ApiConfig.buildUrl(endpointKey, pathParams: pathParams),
+    );
+  }
+
+  Future<Map<String, dynamic>> _request({
+    required String method,
+    required String url,
+    Map<String, dynamic>? body,
+    Map<String, String>? queryParams,
+  }) async {
+    Uri uri = Uri.parse(url);
+    if (queryParams != null && queryParams.isNotEmpty) {
+      uri = uri.replace(queryParameters: queryParams);
+    }
+
+    http.Response? response;
+    Exception? lastException;
+
+    for (int attempt = 0; attempt <= _maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          final delay = ApiConfig.retryDelay(attempt - 1);
+          _log('Retrying in ${delay.inSeconds}s (attempt $attempt/$_maxRetries)');
+          await Future.delayed(delay);
+        }
+
+        final requestHeaders = Map<String, String>.from(_headers);
+        if (method == 'GET') {
+          requestHeaders.remove('Content-Type');
+        }
+
+        final request = http.Request(method, uri);
+        request.headers.addAll(requestHeaders);
+
+        if (body != null) {
+          request.body = jsonEncode(body);
+        }
+
+        _log('$method $uri');
+        if (body != null) {
+          _log('Body: ${jsonEncode(body)}');
+        }
+
+        final streamedResponse = await request.send().timeout(
+          ApiConfig.timeout,
+          onTimeout: () => throw TimeoutException(
+            'Request to $url timed out after ${ApiConfig.timeout.inSeconds}s',
+          ),
+        );
+
+        response = await http.Response.fromStream(streamedResponse);
+
+        _log('Response [${response.statusCode}]: ${response.body}');
+
+        lastException = null;
+        break;
+      } on TimeoutException catch (e) {
+        lastException = e;
+        _log('Timeout on attempt ${attempt + 1}: $e');
+        if (attempt == _maxRetries) break;
+      } catch (e) {
+        lastException = e as Exception;
+        _log('Error on attempt ${attempt + 1}: $e');
+        if (attempt == _maxRetries) break;
+      }
+    }
+
+    if (lastException != null) {
+      throw lastException!;
+    }
+
+    return _handleResponse(response!);
+  }
+
+  Map<String, dynamic> _handleResponse(http.Response response) {
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      if (response.body.isEmpty) return {};
+      try {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      } catch (_) {
+        return {'data': response.body};
+      }
+    }
+
+    String message;
+    dynamic data;
+
+    try {
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      message = body['message'] as String? ?? body['error'] as String? ?? 'Unknown error';
+      data = body;
+    } catch (_) {
+      message = response.body.isNotEmpty ? response.body : 'Unknown error';
+    }
+
+    throw ApiException(message, statusCode: response.statusCode, data: data);
+  }
+
+  void _log(String message) {
+    if (kDebugMode) {
+      developer.log(message, name: 'ApiService');
+    }
+  }
+
+  // ── Course endpoints ──
+
+  Future<List<dynamic>> getCourses({
+    int page = 1,
+    int perPage = 20,
+    String? category,
+    String? search,
+  }) async {
+    final queryParams = <String, String>{
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+    };
+    if (category != null) queryParams['category'] = category;
+    if (search != null) queryParams['search'] = search;
+
+    final result = await get('courses', queryParams: queryParams);
+    return result['data'] as List<dynamic>? ?? [];
+  }
+
+  Future<Map<String, dynamic>> getCourse(String id) async {
+    return get('courseDetail', pathParams: {'id': id});
+  }
+
+  Future<List<dynamic>> getLessons(String courseId) async {
+    final result = await get('lessons', pathParams: {'courseId': courseId});
+    return result['data'] as List<dynamic>? ?? [];
+  }
+
+  Future<List<dynamic>> getQuizzes(String courseId) async {
+    final result = await get('quizzes', pathParams: {'courseId': courseId});
+    return result['data'] as List<dynamic>? ?? [];
+  }
+
+  Future<Map<String, dynamic>> getCourseProgress(String courseId) async {
+    return get('progress', pathParams: {'courseId': courseId});
+  }
+
+  Future<Map<String, dynamic>> updateProgress(
+    String courseId,
+    Map<String, dynamic> progressData,
+  ) async {
+    return post(
+      'progressUpdate',
+      pathParams: {'courseId': courseId},
+      body: progressData,
+    );
+  }
+
+  // ── Auth endpoints ──
+
+  Future<Map<String, dynamic>> login(String email, String password) async {
+    final result = await post('auth', body: {
+      'email': email,
+      'password': password,
+    });
+
+    if (result['token'] != null) {
+      await _storageService.saveString('auth_token', result['token'] as String);
+    }
+
+    return result;
+  }
+
+  Future<Map<String, dynamic>> register(
+    String name,
+    String email,
+    String password,
+  ) async {
+    final result = await post('register', body: {
+      'name': name,
+      'email': email,
+      'password': password,
+    });
+
+    if (result['token'] != null) {
+      await _storageService.saveString('auth_token', result['token'] as String);
+    }
+
+    return result;
+  }
+
+  Future<void> logout() async {
+    await _storageService.remove('auth_token');
+    await _storageService.remove('user_data');
+  }
+
+  // ── Profile endpoints ──
+
+  Future<Map<String, dynamic>> getProfile() async {
+    return get('profile');
+  }
+
+  Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
+    return put('updateProfile', body: data);
+  }
+
+  // ── Wishlist endpoints ──
+
+  Future<List<dynamic>> getWishlist() async {
+    final result = await get('wishlist');
+    return result['data'] as List<dynamic>? ?? [];
+  }
+
+  Future<Map<String, dynamic>> addToWishlist(String courseId) async {
+    return post('wishlistAdd', pathParams: {'courseId': courseId});
+  }
+
+  Future<Map<String, dynamic>> removeFromWishlist(String courseId) async {
+    return delete('wishlistRemove', pathParams: {'courseId': courseId});
+  }
+}
