@@ -74,6 +74,7 @@ jobs:
           cp /tmp/pagepilot_pubspec.yaml pubspec.yaml
           cp /tmp/pagepilot_pubspec.lock pubspec.lock 2>/dev/null || true
           cp /tmp/pagepilot_analysis.yaml analysis_options.yaml 2>/dev/null || true
+          rm -rf test/
 
       - name: Restore Dart code
         run: |
@@ -131,6 +132,7 @@ jobs:
           cp /tmp/pagepilot_pubspec.yaml pubspec.yaml
           cp /tmp/pagepilot_pubspec.lock pubspec.lock 2>/dev/null || true
           cp /tmp/pagepilot_analysis.yaml analysis_options.yaml 2>/dev/null || true
+          rm -rf test/
 
       - name: Restore Dart code
         run: |
