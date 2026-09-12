@@ -59,7 +59,36 @@ class AppConfig {
   }
 
   static Future<void> load() async {
-    _instance = AppConfig._fromDefaults();
+    _instance = AppConfig._(
+      appName: 'WP Mobile App',
+      packageName: 'com.wpmobileapp.app',
+      primaryColor: Color(0xFF6C63FF),
+      secondaryColor: Color(0xFFFF6584),
+      accentColor: Color(0xFF00C9A7),
+      bgColor: Color(0xFFFFFFFF),
+      textColor: Color(0xFF333333),
+      primaryColorDark: Color(0xFF6C63FF).withOpacity(0.8),
+      siteUrl: 'https://wpmobileapps.us23.cdn-alpha.com',
+      apiBaseUrl: 'https://wpmobileapps.us23.cdn-alpha.com/wp-json',
+      wpBaseUrl: 'https://wpmobileapps.us23.cdn-alpha.com',
+      logoAsset: '',
+      appTagline: 'Learn anytime, anywhere',
+      categories: [],
+      screens: {
+        'home': true,
+        'courses': true,
+        'wishlist': true,
+        'profile': true,
+        'quiz': true,
+        'search': true,
+        'settings': true,
+      },
+      features: {
+        'darkMode': true,
+        'googleLogin': false,
+        'facebookLogin': false,
+      },
+    );
   }
 
   factory AppConfig.fromJson(Map<String, dynamic> json) {
@@ -71,66 +100,19 @@ class AppConfig {
       accentColor: _parseColor(json['accentColor'] as String? ?? '#00C9A7'),
       bgColor: _parseColor(json['bgColor'] as String? ?? '#FFFFFF'),
       textColor: _parseColor(json['textColor'] as String? ?? '#1E1E2D'),
-      primaryColorDark: _parseColor(json['primaryColorDark'] as String? ?? '#4A42B0'),
-      logoAsset: json['logoAsset'] as String? ?? '',
-      appTagline: json['appTagline'] as String? ?? '',
-      siteUrl: json['siteUrl'] as String? ?? 'https://pagepilot.com',
+      primaryColorDark: _parseColor(json['primaryColor'] as String? ?? '#6C63FF').withOpacity(0.8),
+      siteUrl: json['siteUrl'] as String? ?? '',
       apiBaseUrl: json['apiBaseUrl'] as String? ?? '',
       wpBaseUrl: json['wpBaseUrl'] as String? ?? '',
-      categories: (json['categories'] as List<dynamic>?)
-              ?.map((e) => Category.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
-      screens: json['screens'] != null
-          ? Map<String, bool>.from(json['screens'] as Map)
-          : {},
-      features: json['features'] != null
-          ? Map<String, bool>.from(json['features'] as Map)
-          : {},
+      logoAsset: json['logoAsset'] as String? ?? '',
+      appTagline: json['appTagline'] as String? ?? 'Learn anytime, anywhere',
+      categories: (json['categories'] as List<dynamic>?)?.map((e) => Category.fromJson(e as Map<String, dynamic>)).toList() ?? [],
+      screens: json['screens'] != null ? Map<String, bool>.from(json['screens'] as Map) : {},
+      features: json['features'] != null ? Map<String, bool>.from(json['features'] as Map) : {},
       enableGoogleLogin: json['enableGoogleLogin'] as bool? ?? true,
       enableFacebookLogin: json['enableFacebookLogin'] as bool? ?? true,
       showProfileTab: json['showProfileTab'] as bool? ?? true,
       showSettingsTab: json['showSettingsTab'] as bool? ?? true,
-    );
-  }
-
-  static AppConfig _fromDefaults() {
-    return AppConfig._(
-      appName: 'PagePilot',
-      packageName: 'com.pagepilot.app',
-      primaryColor: _parseColor('#6C63FF'),
-      secondaryColor: _parseColor('#FF6584'),
-      accentColor: _parseColor('#00C9A7'),
-      bgColor: _parseColor('#FFFFFF'),
-      textColor: _parseColor('#1E1E2D'),
-      primaryColorDark: _parseColor('#4A42B0'),
-      logoAsset: '',
-      appTagline: 'Learn. Build. Grow.',
-      siteUrl: '',
-      apiBaseUrl: '',
-      wpBaseUrl: '',
-      categories: const [],
-      screens: const {
-        'home': true,
-        'courses': true,
-        'courseDetail': true,
-        'lesson': true,
-        'quiz': true,
-        'profile': true,
-        'wishlist': true,
-        'settings': true,
-      },
-      features: const {
-        'pushNotifications': true,
-        'darkMode': true,
-        'offlineMode': false,
-        'socialLogin': true,
-        'inAppPurchase': false,
-      },
-      enableGoogleLogin: true,
-      enableFacebookLogin: true,
-      showProfileTab: true,
-      showSettingsTab: true,
     );
   }
 
@@ -155,19 +137,12 @@ class AppConfig {
   final bool showProfileTab;
   final bool showSettingsTab;
 
-  bool isScreenEnabled(String screenName) {
-    return screens[screenName] ?? false;
-  }
-
-  bool isFeatureEnabled(String featureName) {
-    return features[featureName] ?? false;
-  }
+  bool isScreenEnabled(String screenName) => screens[screenName] ?? false;
+  bool isFeatureEnabled(String featureName) => features[featureName] ?? false;
 
   static Color _parseColor(String hex) {
     hex = hex.replaceFirst('#', '');
-    if (hex.length == 6) {
-      hex = 'FF$hex';
-    }
+    if (hex.length == 6) hex = 'FF';
     return Color(int.parse(hex, radix: 16));
   }
 }
