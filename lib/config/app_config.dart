@@ -75,7 +75,7 @@ class AppConfig {
       logoAsset: json['logoAsset'] as String? ?? '',
       appTagline: json['appTagline'] as String? ?? '',
       siteUrl: json['siteUrl'] as String? ?? 'https://pagepilot.com',
-      apiBaseUrl: json['apiBaseUrl'] as String? ?? 'https://api.pagepilot.com/v1',
+      apiBaseUrl: json['apiBaseUrl'] as String? ?? '',
       wpBaseUrl: json['wpBaseUrl'] as String? ?? '',
       categories: (json['categories'] as List<dynamic>?)
               ?.map((e) => Category.fromJson(e as Map<String, dynamic>))
@@ -106,9 +106,9 @@ class AppConfig {
       primaryColorDark: _parseColor('#4A42B0'),
       logoAsset: '',
       appTagline: 'Learn. Build. Grow.',
-      siteUrl: 'https://pagepilot.com',
-      apiBaseUrl: 'https://api.pagepilot.com/v1',
-      wpBaseUrl: 'https://pagepilot.com',
+      siteUrl: '',
+      apiBaseUrl: '',
+      wpBaseUrl: '',
       categories: const [],
       screens: const {
         'home': true,
