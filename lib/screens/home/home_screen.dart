@@ -73,13 +73,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadEnrolledCourses() async {
-    setState(() => _isLoadingEnrolled = true);
     try {
       final courses = await ApiService.instance.getEnrolledCourses();
       if (mounted) setState(() => _enrolledCourses = courses);
     } catch (_) {
-    } finally {
-      if (mounted) setState(() => _isLoadingEnrolled = false);
     }
   }
 
