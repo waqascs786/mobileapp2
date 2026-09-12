@@ -53,10 +53,11 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		74858FA91ED2DC5600515810 = {
+		0867D690FE84155DC02AAC07 = {
 			isa = PBXGroup;
 			children = (
 				74858FAF1ED2DC5600515810 /* Runner */,
+				9740EEB21CF90195004384FC /* Flutter */,
 				74858FAA1ED2DC5600515810 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -145,7 +146,7 @@
 				en,
 				Base,
 			);
-			mainGroup = 74858FA91ED2DC5600515810;
+			mainGroup = 0867D690FE84155DC02AAC07;
 			productRefGroup = 74858FAA1ED2DC5600515810 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";

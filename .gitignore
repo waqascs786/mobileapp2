@@ -1,0 +1,37 @@
+# Flutter
+*.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+pubspec.lock
+
+# Android
+android/.gradle/
+android/local.properties
+android/app/debug/
+android/app/profile/
+android/app/release/
+android/local.properties
+*.jks
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/ephemeral/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Flutter/flutter_lldbinit
+ios/Flutter/flutter_lldb_helper.py
+ios/Flutter/ephemeral/flutter_native_integration.env
+ios/Runner/GeneratedPluginRegistrant.*
+ios/Runner.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+
+# macOS
+.DS_Store
+*.pyc
+
+# IDE
+.idea/
+.vscode/
+*.iml
