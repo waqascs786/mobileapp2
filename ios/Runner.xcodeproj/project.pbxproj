@@ -198,22 +198,6 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXVariantGroup section */
-		74858FB21ED2DC5600515810 /* LaunchScreen.storyboard */ = {
-			isa = PBXVariantGroup;
-			children = (
-				74858FB21ED2DC5600515810 /* LaunchScreen.storyboard */,
-			);
-			name = LaunchScreen.storyboard;
-			sourceTree = "<group>";
-		};
-		74858FB41ED2DC5600515810 /* Main.storyboard */ = {
-			isa = PBXVariantGroup;
-			children = (
-				74858FB41ED2DC5600515810 /* Main.storyboard */,
-			);
-			name = Main.storyboard;
-			sourceTree = "<group>";
-		};
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
