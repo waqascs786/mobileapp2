@@ -61,6 +61,31 @@ jobs:
       - name: Flutter version
         run: flutter --version
 
+      - name: Save our Dart code
+        run: |
+          cp -R lib /tmp/pagepilot_lib
+          cp pubspec.yaml /tmp/pagepilot_pubspec.yaml
+          cp pubspec.lock /tmp/pagepilot_pubspec.lock 2>/dev/null || true
+          cp analysis_options.yaml /tmp/pagepilot_analysis.yaml 2>/dev/null || true
+
+      - name: Generate Flutter scaffold
+        run: |
+          flutter create --project-name pagepilot_app --org com.example --platforms android .
+          cp /tmp/pagepilot_pubspec.yaml pubspec.yaml
+          cp /tmp/pagepilot_pubspec.lock pubspec.lock 2>/dev/null || true
+          cp /tmp/pagepilot_analysis.yaml analysis_options.yaml 2>/dev/null || true
+
+      - name: Restore Dart code
+        run: |
+          rm -rf lib
+          cp -R /tmp/pagepilot_lib lib
+
+      - name: Apply app config
+        run: |
+          sed -i "s|com.example.pagepilot|${{ env.PACKAGE_NAME }}|g" android/app/build.gradle
+          sed -i "s|namespace = \"com.example.pagepilot\"|namespace = \"${{ env.PACKAGE_NAME }}\"|g" android/app/build.gradle
+          sed -i "s|applicationId = \"com.example.pagepilot\"|applicationId = \"${{ env.PACKAGE_NAME }}\"|g" android/app/build.gradle
+
       - name: Get dependencies
         run: flutter pub get
 
@@ -93,6 +118,25 @@ jobs:
       - name: Flutter version
         run: flutter --version
 
+      - name: Save our Dart code
+        run: |
+          cp -R lib /tmp/pagepilot_lib
+          cp pubspec.yaml /tmp/pagepilot_pubspec.yaml
+          cp pubspec.lock /tmp/pagepilot_pubspec.lock 2>/dev/null || true
+          cp analysis_options.yaml /tmp/pagepilot_analysis.yaml 2>/dev/null || true
+
+      - name: Generate Flutter scaffold
+        run: |
+          flutter create --project-name pagepilot_app --org com.example --platforms ios .
+          cp /tmp/pagepilot_pubspec.yaml pubspec.yaml
+          cp /tmp/pagepilot_pubspec.lock pubspec.lock 2>/dev/null || true
+          cp /tmp/pagepilot_analysis.yaml analysis_options.yaml 2>/dev/null || true
+
+      - name: Restore Dart code
+        run: |
+          rm -rf lib
+          cp -R /tmp/pagepilot_lib lib
+
       - name: Get dependencies
         run: flutter pub get
 
@@ -109,5 +153,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-build-${{ env.BUILD_NUMBER }}
-          path: build/ios/iphoneos/ios-build-${{ env.BUILD_NUMBER }}.zip
+          path: build/ios/iphonesimulator/ios-build-${{ env.BUILD_NUMBER }}.zip
           retention-days: 30
