@@ -895,7 +895,6 @@ class _TrueFalseAnswer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Row(
       children: [
         Expanded(
@@ -1129,7 +1128,6 @@ class _QuizResultScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final result = provider.submitQuiz();
-    final quiz = provider.quiz!;
 
     return Scaffold(
       appBar: AppBar(

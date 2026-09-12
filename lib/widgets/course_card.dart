@@ -246,7 +246,7 @@ class CourseCard extends StatelessWidget {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
-              color: Theme.of(context).primaryColor,
+              color: theme.primaryColor,
             ),
           ),
         ] else
@@ -255,7 +255,7 @@ class CourseCard extends StatelessWidget {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
-              color: Theme.of(context).primaryColor,
+              color: theme.primaryColor,
             ),
           ),
       ],

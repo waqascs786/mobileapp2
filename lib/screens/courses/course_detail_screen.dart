@@ -3,9 +3,7 @@ import '../../config/app_config.dart';
 import '../../models/course.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
-import '../../widgets/shimmer_loading.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class CourseDetailScreen extends StatefulWidget {
   static const route = '/course-detail';

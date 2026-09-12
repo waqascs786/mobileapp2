@@ -4,7 +4,6 @@ import '../../services/auth_service.dart';
 import '../../utils/validators.dart';
 import '../../widgets/loading_overlay.dart';
 import '../home/home_screen.dart';
-import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   static const route = '/register';

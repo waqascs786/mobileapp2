@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 enum CurriculumItemType { lesson, quiz }
 
 class Course {

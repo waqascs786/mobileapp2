@@ -4,7 +4,6 @@ import '../../config/app_config.dart';
 import '../../models/course.dart';
 import '../../services/api_service.dart';
 import '../../widgets/course_card.dart';
-import '../../widgets/shimmer_loading.dart';
 import 'course_detail_screen.dart';
 
 class CourseListScreen extends StatefulWidget {
@@ -484,31 +483,33 @@ class _CourseListScreenState extends State<CourseListScreen> {
       controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       slivers: [
-        SliverList.separated(
+        SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          itemCount: _courses.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            final course = _courses[index];
-            return CourseCard(
-              thumbnailUrl: course.thumbnail,
-              title: course.title,
-              instructorName: course.instructor.name,
-              rating: course.rating,
-              ratingCount: course.ratingCount,
-              price: course.price,
-              salePrice: course.salePrice,
-              isFree: course.isFree,
-              progress: course.isEnrolled ? course.progress : null,
-              isEnrolled: course.isEnrolled,
-              mode: CourseCardMode.list,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => CourseDetailScreen(courseId: course.id.toString()),
+          sliver: SliverList.separated(
+            itemCount: _courses.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final course = _courses[index];
+              return CourseCard(
+                thumbnailUrl: course.thumbnail,
+                title: course.title,
+                instructorName: course.instructor.name,
+                rating: course.rating,
+                ratingCount: course.ratingCount,
+                price: course.price,
+                salePrice: course.salePrice,
+                isFree: course.isFree,
+                progress: course.isEnrolled ? course.progress : null,
+                isEnrolled: course.isEnrolled,
+                mode: CourseCardMode.list,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => CourseDetailScreen(courseId: course.id.toString()),
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
         if (_isLoadingMore)
           const SliverToBoxAdapter(

@@ -3,12 +3,10 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
-import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 
 // ─── Models ──────────────────────────────────────────────────────────────────
@@ -848,7 +846,6 @@ class _LessonVideoPlayerState extends State<_LessonVideoPlayer> {
   }
 
   String _formatDuration(Duration d) {
-    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
     final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
     return '${d.inMinutes > 0 ? '${d.inMinutes}:' : ''}$seconds';
   }

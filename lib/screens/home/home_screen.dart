@@ -27,7 +27,6 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Course> _enrolledCourses = [];
   bool _isLoadingFeatured = true;
   bool _isLoadingPopular = true;
-  bool _isLoadingEnrolled = true;
 
   @override
   void initState() {
