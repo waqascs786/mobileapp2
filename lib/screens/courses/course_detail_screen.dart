@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../config/app_config.dart';
-import '../../models/course_model.dart';
-import '../../models/review_model.dart';
-import '../../models/curriculum_model.dart';
+import '../../models/course.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/shimmer_loading.dart';
@@ -10,7 +8,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class CourseDetailScreen extends StatefulWidget {
-  final int courseId;
+  static const route = '/course-detail';
+  final String courseId;
 
   const CourseDetailScreen({super.key, required this.courseId});
 
@@ -22,8 +21,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   Course? _course;
-  CourseDetail? _courseDetail;
-  List<Review> _reviews = [];
+  List<dynamic> _reviews = [];
   bool _isLoading = true;
   bool _isLoadingReviews = true;
   bool _isWishlisted = false;
@@ -50,12 +48,12 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     });
 
     try {
-      final detail = await ApiService.instance.getCourseDetail(widget.courseId);
+      final data = await ApiService.instance.getCourse(widget.courseId);
       if (!mounted) return;
+      final course = Course.fromJson(data);
       setState(() {
-        _courseDetail = detail;
-        _course = detail.course;
-        _isWishlisted = detail.isWishlisted;
+        _course = course;
+        _isWishlisted = course.isWishlisted;
         _isLoading = false;
       });
     } catch (e) {
@@ -70,7 +68,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
   Future<void> _loadReviews() async {
     setState(() => _isLoadingReviews = true);
     try {
-      final reviews = await ApiService.instance.getCourseReviews(widget.courseId);
+      final reviews = await ApiService.instance.getCourseReviews(int.tryParse(widget.courseId) ?? 0);
       if (mounted) setState(() => _reviews = reviews);
     } catch (_) {
     } finally {
@@ -101,12 +99,12 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
   Future<void> _shareCourse() async {
     if (_course == null) return;
     final config = AppConfig.of(context);
-    final url = '${config.wpBaseUrl}/courses/${_course!.slug}';
+    final url = '${config.wpBaseUrl}/courses/${_course!.id}';
     await Share.share('Check out this course: ${_course!.title}\n$url');
   }
 
   Future<void> _handleEnrollTap() async {
-    final isAuthenticated = await AuthService.instance.isAuthenticated;
+    final isAuthenticated = AuthService.instance.isAuthenticated;
     if (!mounted) return;
 
     if (!isAuthenticated) {
@@ -114,10 +112,9 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
       return;
     }
 
-    if (_courseDetail == null) return;
+    if (_course == null) return;
 
     if (_course!.isEnrolled) {
-      // Navigate to first incomplete lesson
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Opening course content...')),
       );
@@ -149,7 +146,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
               'Please login to enroll in this course',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
               ),
             ),
             const SizedBox(height: 24),
@@ -195,7 +192,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -217,7 +214,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                   : 'You will be charged \$${price.toStringAsFixed(2)}',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
               ),
             ),
             const SizedBox(height: 24),
@@ -246,7 +243,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
 
   Future<void> _processEnrollment() async {
     try {
-      await ApiService.instance.enrollCourse(widget.courseId);
+      await ApiService.instance.enrollCourse(int.tryParse(widget.courseId) ?? 0);
       if (!mounted) return;
       _loadCourseDetail();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -296,7 +293,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     }
 
     final course = _course!;
-    final detail = _courseDetail!;
 
     return Scaffold(
       body: CustomScrollView(
@@ -306,12 +302,12 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
           SliverToBoxAdapter(child: _buildTabBar(config)),
           SliverToBoxAdapter(
             child: SizedBox(
-              height: _calculateTabContentHeight(detail),
+              height: _calculateTabContentHeight(course),
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  _buildCurriculumTab(detail, config),
-                  _buildOverviewTab(detail, config),
+                  _buildCurriculumTab(course, config),
+                  _buildOverviewTab(course, config),
                   _buildReviewsTab(config),
                 ],
               ),
@@ -333,7 +329,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
         icon: Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.3),
+            color: Colors.black.withOpacity(0.3),
             shape: BoxShape.circle,
           ),
           child: const Icon(Icons.arrow_back_ios_new, size: 18, color: Colors.white),
@@ -345,7 +341,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
           icon: Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.3),
+              color: Colors.black.withOpacity(0.3),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -360,7 +356,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
           icon: Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.3),
+              color: Colors.black.withOpacity(0.3),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.share, size: 20, color: Colors.white),
@@ -392,7 +388,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                     child: Icon(
                       Icons.play_circle_fill,
                       size: 72,
-                      color: Colors.white.withValues(alpha: 0.8),
+                      color: Colors.white.withOpacity(0.8),
                     ),
                   ),
           ),
@@ -416,11 +412,11 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                   .map((cat) => Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: config.primaryColor.withValues(alpha: 0.1),
+                          color: config.primaryColor.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          cat.name,
+                          cat,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
@@ -444,9 +440,9 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
             children: [
               CircleAvatar(
                 radius: 14,
-                backgroundColor: config.primaryColor.withValues(alpha: 0.1),
+                backgroundColor: config.primaryColor.withOpacity(0.1),
                 child: Text(
-                  course.instructor.initials,
+                  course.instructor.name.initials,
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
@@ -466,7 +462,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
             children: [
               _buildInfoChip(Icons.star_rounded, '${course.rating}', Colors.amber),
               const SizedBox(width: 12),
-              _buildInfoChip(Icons.people_outline, '${course.enrolledCount} students', null),
+              _buildInfoChip(Icons.people_outline, '${course.studentsCount} students', null),
               const SizedBox(width: 12),
               _buildInfoChip(Icons.schedule, course.duration, null),
             ],
@@ -480,13 +476,13 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 18, color: iconColor ?? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
+        Icon(icon, size: 18, color: iconColor ?? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
         const SizedBox(width: 4),
         Text(
           text,
           style: TextStyle(
             fontSize: 13,
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
           ),
         ),
       ],
@@ -498,14 +494,14 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
-            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
+            color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
           ),
         ),
       ),
       child: TabBar(
         controller: _tabController,
         labelColor: config.primaryColor,
-        unselectedLabelColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+        unselectedLabelColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
         indicatorColor: config.primaryColor,
         indicatorWeight: 3,
         tabs: const [
@@ -517,8 +513,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     );
   }
 
-  Widget _buildCurriculumTab(CourseDetail detail, AppConfig config) {
-    if (detail.curriculum.isEmpty) {
+  Widget _buildCurriculumTab(Course course, AppConfig config) {
+    if (course.curriculum.isEmpty) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(32),
@@ -530,25 +526,25 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     return ListView.builder(
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      itemCount: detail.curriculum.length,
+      itemCount: course.curriculum.length,
       itemBuilder: (context, index) {
-        final section = detail.curriculum[index];
-        return _CurriculumSection(
+        final section = course.curriculum[index];
+        return _CurriculumSectionWidget(
           section: section,
           primaryColor: config.primaryColor,
-          isExpanded: detail.curriculum.length == 1,
+          isExpanded: course.curriculum.length == 1,
         );
       },
     );
   }
 
-  Widget _buildOverviewTab(CourseDetail detail, AppConfig config) {
+  Widget _buildOverviewTab(Course course, AppConfig config) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (detail.course.description.isNotEmpty) ...[
+          if (course.description.isNotEmpty) ...[
             Text(
               'Description',
               style: TextStyle(
@@ -559,16 +555,16 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
             ),
             const SizedBox(height: 12),
             Text(
-              detail.course.description,
+              course.description,
               style: TextStyle(
                 fontSize: 15,
                 height: 1.6,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
               ),
             ),
             const SizedBox(height: 24),
           ],
-          if (detail.whatYouLearn.isNotEmpty) ...[
+          if (course.tags.isNotEmpty) ...[
             Text(
               "What you'll learn",
               style: TextStyle(
@@ -578,7 +574,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
               ),
             ),
             const SizedBox(height: 12),
-            ...detail.whatYouLearn.map((item) => Padding(
+            ...course.tags.map((item) => Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -591,7 +587,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                           style: TextStyle(
                             fontSize: 14,
                             height: 1.4,
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                           ),
                         ),
                       ),
@@ -600,7 +596,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                 )),
             const SizedBox(height: 24),
           ],
-          if (detail.requirements.isNotEmpty) ...[
+          if (course.shortDescription.isNotEmpty) ...[
             Text(
               'Requirements',
               style: TextStyle(
@@ -610,26 +606,26 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
               ),
             ),
             const SizedBox(height: 12),
-            ...detail.requirements.map((item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.circle, size: 6, color: config.primaryColor),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          item,
-                          style: TextStyle(
-                            fontSize: 14,
-                            height: 1.4,
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                          ),
-                        ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.circle, size: 6, color: config.primaryColor),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      course.shortDescription,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.4,
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                       ),
-                    ],
+                    ),
                   ),
-                )),
+                ],
+              ),
+            ),
           ],
           const SizedBox(height: 80),
         ],
@@ -653,7 +649,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
               'No reviews yet',
               style: TextStyle(
                 fontSize: 16,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
               ),
             ),
           ],
@@ -663,9 +659,9 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
 
     final avgRating = _reviews.isEmpty
         ? 0.0
-        : _reviews.map((r) => r.rating).reduce((a, b) => a + b) / _reviews.length;
+        : _reviews.map((r) => (r['rating'] as num?)?.toDouble() ?? 0.0).reduce((a, b) => a + b) / _reviews.length;
     final ratingCounts = List.generate(5, (i) {
-      return _reviews.where((r) => r.rating == 5 - i).length;
+      return _reviews.where((r) => (r['rating'] as num?)?.toInt() == 5 - i).length;
     });
     final totalReviews = _reviews.length;
 
@@ -709,7 +705,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
               '$total reviews',
               style: TextStyle(
                 fontSize: 13,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
               ),
             ),
           ],
@@ -727,7 +723,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                     SizedBox(
                       width: 32,
                       child: Text(
-                        '${5 - i}★',
+                        '${5 - i}',
                         textAlign: TextAlign.right,
                         style: const TextStyle(fontSize: 12),
                       ),
@@ -762,7 +758,12 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     );
   }
 
-  Widget _buildReviewCard(Review review, AppConfig config) {
+  Widget _buildReviewCard(dynamic review, AppConfig config) {
+    final userName = review['userName'] as String? ?? 'Anonymous';
+    final rating = (review['rating'] as num?)?.toInt() ?? 0;
+    final comment = review['comment'] as String? ?? '';
+    final date = review['date'] as String? ?? '';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -770,7 +771,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
+          color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
         ),
       ),
       child: Column(
@@ -780,9 +781,9 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
             children: [
               CircleAvatar(
                 radius: 18,
-                backgroundColor: config.primaryColor.withValues(alpha: 0.1),
+                backgroundColor: config.primaryColor.withOpacity(0.1),
                 child: Text(
-                  review.userName.initials,
+                  userName.initials,
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -796,15 +797,15 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      review.userName,
+                      userName,
                       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      review.date,
+                      date,
                       style: TextStyle(
                         fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
                       ),
                     ),
                   ],
@@ -814,7 +815,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                 children: List.generate(
                   5,
                   (i) => Icon(
-                    i < review.rating ? Icons.star_rounded : Icons.star_border_rounded,
+                    i < rating ? Icons.star_rounded : Icons.star_border_rounded,
                     color: Colors.amber,
                     size: 16,
                   ),
@@ -824,11 +825,11 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
           ),
           const SizedBox(height: 12),
           Text(
-            review.comment,
+            comment,
             style: TextStyle(
               fontSize: 14,
               height: 1.5,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
             ),
           ),
         ],
@@ -846,7 +847,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
         color: Theme.of(context).colorScheme.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             blurRadius: 16,
             offset: const Offset(0, -4),
           ),
@@ -892,30 +893,30 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     );
   }
 
-  double _calculateTabContentHeight(CourseDetail detail) {
-    final maxSections = detail.curriculum.length;
-    final totalLessons = detail.curriculum.fold<int>(0, (sum, s) => sum + s.lessons.length);
+  double _calculateTabContentHeight(Course course) {
+    final maxSections = course.curriculum.length;
+    final totalLessons = course.curriculum.fold<int>(0, (sum, s) => sum + s.items.length);
     final curriculumHeight = (maxSections * 56.0) + (totalLessons * 48.0);
     return 400.0 + curriculumHeight;
   }
 }
 
-class _CurriculumSection extends StatefulWidget {
+class _CurriculumSectionWidget extends StatefulWidget {
   final CurriculumSection section;
   final Color primaryColor;
   final bool isExpanded;
 
-  const _CurriculumSection({
+  const _CurriculumSectionWidget({
     required this.section,
     required this.primaryColor,
     this.isExpanded = false,
   });
 
   @override
-  State<_CurriculumSection> createState() => _CurriculumSectionState();
+  State<_CurriculumSectionWidget> createState() => _CurriculumSectionWidgetState();
 }
 
-class _CurriculumSectionState extends State<_CurriculumSection> {
+class _CurriculumSectionWidgetState extends State<_CurriculumSectionWidget> {
   late bool _expanded;
 
   @override
@@ -932,7 +933,7 @@ class _CurriculumSectionState extends State<_CurriculumSection> {
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
+          color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
         ),
       ),
       child: Column(
@@ -948,7 +949,7 @@ class _CurriculumSectionState extends State<_CurriculumSection> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          widget.section.title,
+                          widget.section.sectionTitle,
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
@@ -956,10 +957,10 @@ class _CurriculumSectionState extends State<_CurriculumSection> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${widget.section.lessons.length} lessons',
+                          '${widget.section.items.length} lessons',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                           ),
                         ),
                       ],
@@ -977,14 +978,14 @@ class _CurriculumSectionState extends State<_CurriculumSection> {
           AnimatedCrossFade(
             firstChild: const SizedBox.shrink(),
             secondChild: Column(
-              children: widget.section.lessons.map((lesson) {
+              children: widget.section.items.map((lesson) {
                 return ListTile(
                   dense: true,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                   leading: Icon(
                     lesson.isCompleted
                         ? Icons.check_circle
-                        : lesson.type == 'quiz'
+                        : lesson.type == CurriculumItemType.quiz
                             ? Icons.help_outline
                             : Icons.play_circle_outline,
                     size: 22,
@@ -998,7 +999,7 @@ class _CurriculumSectionState extends State<_CurriculumSection> {
                       fontSize: 14,
                       decoration: lesson.isCompleted ? TextDecoration.lineThrough : null,
                       color: lesson.isCompleted
-                          ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)
+                          ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
                           : null,
                     ),
                   ),
@@ -1006,7 +1007,7 @@ class _CurriculumSectionState extends State<_CurriculumSection> {
                     lesson.duration,
                     style: TextStyle(
                       fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
                     ),
                   ),
                 );

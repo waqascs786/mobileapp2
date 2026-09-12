@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
-import '../config/app_config.dart';
-import '../models/course_model.dart';
-import '../models/user_model.dart';
-import '../services/api_service.dart';
-import '../services/auth_service.dart';
-import '../widgets/course_card.dart';
-import '../widgets/shimmer_loading.dart';
-import 'courses/course_list_screen.dart';
-import 'courses/course_detail_screen.dart';
-import 'profile/profile_screen.dart';
-import 'settings/settings_screen.dart';
-import 'wishlist/wishlist_screen.dart';
+import '../../config/app_config.dart';
+import '../../models/course.dart';
+import '../../services/api_service.dart';
+import '../../services/auth_service.dart';
+import '../../widgets/course_card.dart';
+import '../../widgets/shimmer_loading.dart';
+import '../courses/course_list_screen.dart';
+import '../courses/course_detail_screen.dart';
+import '../profile/profile_screen.dart';
+import '../settings/settings_screen.dart';
+import '../wishlist/wishlist_screen.dart';
 
 class HomeScreen extends StatefulWidget {
+  static const route = '/home';
   const HomeScreen({super.key});
 
   @override
@@ -21,7 +21,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentTabIndex = 0;
-  User? _user;
+  Map<String, dynamic>? _user;
   List<Course> _featuredCourses = [];
   List<Course> _popularCourses = [];
   List<Course> _enrolledCourses = [];
@@ -141,7 +141,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildWelcomeBanner(AppConfig config) {
     final hour = DateTime.now().hour;
     final greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
-    final firstName = _user?.name?.split(' ').first ?? 'Learner';
+    final firstName = _user?['name']?.split(' ').first ?? 'Learner';
 
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -155,7 +155,7 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: config.primaryColor.withValues(alpha: 0.3),
+            color: config.primaryColor.withOpacity( 0.3),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -168,7 +168,7 @@ class _HomeScreenState extends State<HomeScreen> {
             '$greeting,',
             style: TextStyle(
               fontSize: 16,
-              color: Colors.white.withValues(alpha: 0.85),
+              color: Colors.white.withOpacity( 0.85),
               fontWeight: FontWeight.w400,
             ),
           ),
@@ -186,7 +186,7 @@ class _HomeScreenState extends State<HomeScreen> {
             'Continue your learning journey. You\'re doing great!',
             style: TextStyle(
               fontSize: 14,
-              color: Colors.white.withValues(alpha: 0.8),
+              color: Colors.white.withOpacity( 0.8),
               height: 1.4,
             ),
           ),
@@ -204,23 +204,23 @@ class _HomeScreenState extends State<HomeScreen> {
         margin: const EdgeInsets.fromLTRB(20, 20, 20, 0),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity( 0.5),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
+            color: Theme.of(context).colorScheme.outline.withOpacity( 0.1),
           ),
         ),
         child: Row(
           children: [
             Icon(
               Icons.search,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+              color: Theme.of(context).colorScheme.onSurface.withOpacity( 0.4),
             ),
             const SizedBox(width: 12),
             Text(
               'Search courses...',
               style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                color: Theme.of(context).colorScheme.onSurface.withOpacity( 0.4),
                 fontSize: 15,
               ),
             ),
@@ -270,7 +270,7 @@ class _HomeScreenState extends State<HomeScreen> {
             primaryColor: config.primaryColor,
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => CourseDetailScreen(courseId: course.id),
+                builder: (_) => CourseDetailScreen(courseId: course.id.toString()),
               ),
             ),
           );
@@ -298,11 +298,17 @@ class _HomeScreenState extends State<HomeScreen> {
         itemBuilder: (context, index) {
           final course = _featuredCourses[index];
           return CourseCard(
-            course: course,
-            primaryColor: config.primaryColor,
+            thumbnailUrl: course.thumbnail,
+            title: course.title,
+            instructorName: course.instructor.name,
+            rating: course.rating,
+            ratingCount: course.ratingCount,
+            price: course.price,
+            salePrice: course.salePrice,
+            isFree: course.isFree,
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => CourseDetailScreen(courseId: course.id),
+                builder: (_) => CourseDetailScreen(courseId: course.id.toString()),
               ),
             ),
           );
@@ -327,11 +333,17 @@ class _HomeScreenState extends State<HomeScreen> {
         itemBuilder: (context, index) {
           final course = _popularCourses[index];
           return CourseCard(
-            course: course,
-            primaryColor: config.primaryColor,
+            thumbnailUrl: course.thumbnail,
+            title: course.title,
+            instructorName: course.instructor.name,
+            rating: course.rating,
+            ratingCount: course.ratingCount,
+            price: course.price,
+            salePrice: course.salePrice,
+            isFree: course.isFree,
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => CourseDetailScreen(courseId: course.id),
+                builder: (_) => CourseDetailScreen(courseId: course.id.toString()),
               ),
             ),
           );
@@ -367,10 +379,10 @@ class _HomeScreenState extends State<HomeScreen> {
             },
             child: Container(
               decoration: BoxDecoration(
-                color: config.primaryColor.withValues(alpha: 0.08),
+                color: config.primaryColor.withOpacity( 0.08),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: config.primaryColor.withValues(alpha: 0.12),
+                  color: config.primaryColor.withOpacity( 0.12),
                 ),
               ),
               child: Column(
@@ -421,7 +433,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Text(
           message,
           style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+            color: Theme.of(context).colorScheme.onSurface.withOpacity( 0.4),
             fontSize: 14,
           ),
         ),
@@ -438,7 +450,7 @@ class _HomeScreenState extends State<HomeScreen> {
         itemCount: 3,
         itemBuilder: (_, __) => const Padding(
           padding: EdgeInsets.symmetric(horizontal: 4),
-          child: ShimmerCard(width: 200, height: 260),
+          child: SizedBox(width: 200, height: 260, child: ShimmerLoading(child: SizedBox.expand())),
         ),
       ),
     );
@@ -464,7 +476,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final config = AppConfig.of(context);
-    final isInstructor = _user?.role == 'instructor';
+    final isInstructor = _user?['role'] == 'instructor';
 
     return Scaffold(
       body: SafeArea(child: _buildCurrentTab()),
@@ -480,7 +492,7 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: _onTabTapped,
         type: BottomNavigationBarType.fixed,
         selectedItemColor: config.primaryColor,
-        unselectedItemColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+        unselectedItemColor: Theme.of(context).colorScheme.onSurface.withOpacity( 0.4),
         selectedFontSize: 12,
         unselectedFontSize: 12,
         elevation: 8,
@@ -513,7 +525,7 @@ class _EnrolledCourseCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
+              color: Colors.black.withOpacity( 0.06),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -527,7 +539,7 @@ class _EnrolledCourseCard extends StatelessWidget {
               child: Container(
                 height: 80,
                 width: double.infinity,
-                color: primaryColor.withValues(alpha: 0.1),
+                color: primaryColor.withOpacity( 0.1),
                 child: course.thumbnail.isNotEmpty
                     ? Image.network(course.thumbnail, fit: BoxFit.cover)
                     : Icon(Icons.play_circle_fill, size: 36, color: primaryColor),

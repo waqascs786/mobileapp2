@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 enum EmptyStateType { noCourses, noResults, noWishlist, noInternet, custom }
 
@@ -125,14 +124,7 @@ class EmptyState extends StatelessWidget {
       return illustrationWidget!;
     }
 
-    if (illustration != null) {
-      if (illustration!.endsWith('.svg')) {
-        return SvgPicture.asset(
-          illustration!,
-          width: 150,
-          height: 150,
-        );
-      }
+      if (illustration != null) {
       return Image.asset(
         illustration!,
         width: 150,

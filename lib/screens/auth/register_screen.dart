@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import '../config/app_config.dart';
-import '../services/auth_service.dart';
-import '../utils/validators.dart';
-import '../widgets/loading_overlay.dart';
-import 'home/home_screen.dart';
-import 'auth/login_screen.dart';
+import '../../config/app_config.dart';
+import '../../services/auth_service.dart';
+import '../../utils/validators.dart';
+import '../../widgets/loading_overlay.dart';
+import '../home/home_screen.dart';
+import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
+  static const route = '/register';
   const RegisterScreen({super.key});
 
   @override
@@ -137,7 +138,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           width: 64,
           height: 64,
           decoration: BoxDecoration(
-            color: config.primaryColor.withValues(alpha: 0.1),
+            color: config.primaryColor.withOpacity(0.1),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Icon(Icons.person_add_outlined, size: 32, color: config.primaryColor),
@@ -156,7 +157,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           'Start your learning journey today',
           style: TextStyle(
             fontSize: 14,
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
           ),
         ),
       ],
@@ -289,7 +290,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   text: 'I agree to the ',
                   style: TextStyle(
                     fontSize: 13,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                   ),
                   children: [
                     TextSpan(
@@ -352,7 +353,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         Text(
           'Already have an account? ',
           style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
           ),
         ),
         GestureDetector(

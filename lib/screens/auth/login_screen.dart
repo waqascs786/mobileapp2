@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import '../config/app_config.dart';
-import '../services/auth_service.dart';
-import '../utils/validators.dart';
-import '../widgets/loading_overlay.dart';
-import 'home/home_screen.dart';
-import 'auth/register_screen.dart';
+import '../../config/app_config.dart';
+import '../../services/auth_service.dart';
+import '../../utils/validators.dart';
+import '../../widgets/loading_overlay.dart';
+import '../home/home_screen.dart';
+import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
+  static const route = '/login';
   const LoginScreen({super.key});
 
   @override
@@ -170,7 +171,7 @@ class _LoginScreenState extends State<LoginScreen> {
           height: size.width * 0.2,
           constraints: const BoxConstraints(maxWidth: 100, maxHeight: 100),
           decoration: BoxDecoration(
-            color: config.primaryColor.withValues(alpha: 0.1),
+            color: config.primaryColor.withOpacity(0.1),
             borderRadius: BorderRadius.circular(24),
           ),
           child: Center(
@@ -193,7 +194,7 @@ class _LoginScreenState extends State<LoginScreen> {
           'Sign in to continue learning',
           style: TextStyle(
             fontSize: 15,
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
           ),
         ),
       ],
@@ -323,7 +324,7 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Text(
             'OR',
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
@@ -366,7 +367,7 @@ class _LoginScreenState extends State<LoginScreen> {
       children: [
         Text(
           "Don't have an account? ",
-          style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
         ),
         GestureDetector(
           onTap: () {
@@ -408,7 +409,7 @@ class _SocialButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 14),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         side: BorderSide(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+          color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
         ),
       ),
     );

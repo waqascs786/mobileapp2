@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 // ─── Models ──────────────────────────────────────────────────────────────────
 
@@ -161,6 +162,7 @@ class WishlistProvider extends ChangeNotifier {
 // ─── Wishlist Screen ─────────────────────────────────────────────────────────
 
 class WishlistScreen extends StatefulWidget {
+  static const route = '/wishlist';
   const WishlistScreen({super.key});
 
   @override

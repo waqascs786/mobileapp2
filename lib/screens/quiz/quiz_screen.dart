@@ -371,6 +371,7 @@ class QuizProvider extends ChangeNotifier {
 // ─── Quiz Screen ─────────────────────────────────────────────────────────────
 
 class QuizScreen extends StatefulWidget {
+  static const route = '/quiz';
   final String quizId;
   final String courseTitle;
 

@@ -6,7 +6,15 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/api_config.dart';
+import '../models/course.dart';
 import 'storage_service.dart';
+
+class CourseListResult {
+  final List<Course> courses;
+  final bool hasMore;
+
+  const CourseListResult({required this.courses, required this.hasMore});
+}
 
 class ApiException implements Exception {
   final String message;
@@ -20,6 +28,19 @@ class ApiException implements Exception {
 }
 
 class ApiService {
+  static ApiService? _staticInstance;
+
+  static ApiService get instance {
+    if (_staticInstance == null) {
+      throw StateError('ApiService not initialized. Call setInstance() first.');
+    }
+    return _staticInstance!;
+  }
+
+  static void setInstance(ApiService svc) {
+    _staticInstance = svc;
+  }
+
   final StorageService _storageService;
   int _maxRetries;
 
@@ -143,7 +164,7 @@ class ApiService {
     }
 
     if (lastException != null) {
-      throw lastException!;
+      throw lastException;
     }
 
     return _handleResponse(response!);
@@ -181,11 +202,12 @@ class ApiService {
 
   // ── Course endpoints ──
 
-  Future<List<dynamic>> getCourses({
+  Future<CourseListResult> getCourses({
     int page = 1,
     int perPage = 20,
     String? category,
     String? search,
+    Map<String, String>? params,
   }) async {
     final queryParams = <String, String>{
       'page': page.toString(),
@@ -193,9 +215,49 @@ class ApiService {
     };
     if (category != null) queryParams['category'] = category;
     if (search != null) queryParams['search'] = search;
+    if (params != null) queryParams.addAll(params);
 
     final result = await get('courses', queryParams: queryParams);
-    return result['data'] as List<dynamic>? ?? [];
+    final list = result['data'] as List<dynamic>? ?? [];
+    final courses = list
+        .map((e) => Course.fromJson(e as Map<String, dynamic>))
+        .toList();
+    final hasMore = result['hasMore'] as bool? ?? false;
+    return CourseListResult(courses: courses, hasMore: hasMore);
+  }
+
+  Future<List<Course>> getFeaturedCourses() async {
+    final result = await getCourses();
+    return result.courses;
+  }
+
+  Future<List<Course>> getPopularCourses() async {
+    final result = await getCourses();
+    return result.courses;
+  }
+
+  Future<List<Course>> getEnrolledCourses() async {
+    final result = await getCourses();
+    return result.courses;
+  }
+
+  Future<Map<String, dynamic>> getCourseDetail(int courseId) async {
+    return get('courseDetail', pathParams: {'id': courseId.toString()});
+  }
+
+  Future<List<dynamic>> getCourseReviews(int courseId) async {
+    final result = await get('courseDetail', pathParams: {'id': courseId.toString()});
+    return result['reviews'] as List<dynamic>? ?? [];
+  }
+
+  Future<void> enrollCourse(int courseId) async {
+    await post('courseDetail', pathParams: {'id': courseId.toString()});
+  }
+
+  Future<List<Map<String, dynamic>>> getCategories() async {
+    final result = await get('categories');
+    final list = result['data'] as List<dynamic>? ?? [];
+    return list.cast<Map<String, dynamic>>();
   }
 
   Future<Map<String, dynamic>> getCourse(String id) async {
@@ -229,7 +291,10 @@ class ApiService {
 
   // ── Auth endpoints ──
 
-  Future<Map<String, dynamic>> login(String email, String password) async {
+  Future<Map<String, dynamic>> login({
+    required String email,
+    required String password,
+  }) async {
     final result = await post('auth', body: {
       'email': email,
       'password': password,
@@ -242,11 +307,11 @@ class ApiService {
     return result;
   }
 
-  Future<Map<String, dynamic>> register(
-    String name,
-    String email,
-    String password,
-  ) async {
+  Future<Map<String, dynamic>> register({
+    required String name,
+    required String email,
+    required String password,
+  }) async {
     final result = await post('register', body: {
       'name': name,
       'email': email,

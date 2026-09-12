@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ─── Models ──────────────────────────────────────────────────────────────────
@@ -90,6 +91,7 @@ class ProfileProvider extends ChangeNotifier {
 // ─── Profile Screen ──────────────────────────────────────────────────────────
 
 class ProfileScreen extends StatefulWidget {
+  static const route = '/profile';
   const ProfileScreen({super.key});
 
   @override

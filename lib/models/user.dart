@@ -9,6 +9,7 @@ class User {
   final int completedCourses;
   final int inProgressCourses;
   final int certificates;
+  final String role;
 
   const User({
     required this.id,
@@ -21,6 +22,7 @@ class User {
     this.completedCourses = 0,
     this.inProgressCourses = 0,
     this.certificates = 0,
+    this.role = 'student',
   });
 
   List<String> get initials {
@@ -51,6 +53,7 @@ class User {
       completedCourses: json['completedCourses'] as int? ?? 0,
       inProgressCourses: json['inProgressCourses'] as int? ?? 0,
       certificates: json['certificates'] as int? ?? 0,
+      role: json['role'] as String? ?? 'student',
     );
   }
 
@@ -66,6 +69,7 @@ class User {
       'completedCourses': completedCourses,
       'inProgressCourses': inProgressCourses,
       'certificates': certificates,
+      'role': role,
     };
   }
 
@@ -80,6 +84,7 @@ class User {
     int? completedCourses,
     int? inProgressCourses,
     int? certificates,
+    String? role,
   }) {
     return User(
       id: id ?? this.id,
@@ -92,6 +97,7 @@ class User {
       completedCourses: completedCourses ?? this.completedCourses,
       inProgressCourses: inProgressCourses ?? this.inProgressCourses,
       certificates: certificates ?? this.certificates,
+      role: role ?? this.role,
     );
   }
 }

@@ -158,6 +158,7 @@ class SettingsProvider extends ChangeNotifier {
 // ─── Settings Screen ─────────────────────────────────────────────────────────
 
 class SettingsScreen extends StatefulWidget {
+  static const route = '/settings';
   const SettingsScreen({super.key});
 
   @override

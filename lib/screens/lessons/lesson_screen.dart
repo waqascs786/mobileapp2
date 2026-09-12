@@ -6,6 +6,7 @@ import 'package:flutter_html/flutter_html.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
@@ -302,6 +303,7 @@ class LessonProvider extends ChangeNotifier {
 // ─── Lesson Screen ───────────────────────────────────────────────────────────
 
 class LessonScreen extends StatefulWidget {
+  static const route = '/lesson';
   final String courseId;
   final String courseTitle;
 
@@ -416,7 +418,7 @@ class _LessonScreenState extends State<LessonScreen> {
                           child: LinearProgressIndicator(
                             value: _provider.progress,
                             minHeight: 6,
-                            backgroundColor: theme.colorScheme.surfaceVariant,
+                            backgroundColor: theme.colorScheme.surfaceContainerHighest,
                           ),
                         ),
                       ),
@@ -535,7 +537,7 @@ class _LessonScreenState extends State<LessonScreen> {
                 child: LinearProgressIndicator(
                   value: _provider.progress,
                   minHeight: 4,
-                  backgroundColor: theme.colorScheme.surfaceVariant,
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
                 ),
               ),
             ),
@@ -563,13 +565,13 @@ class _LessonScreenState extends State<LessonScreen> {
                     fontWeight: FontWeight.w700,
                   ),
                   'code': Style(
-                    backgroundColor: theme.colorScheme.surfaceVariant,
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
                     padding: HtmlPaddings.all(4),
                     fontSize: FontSize(14),
                     fontFamily: 'monospace',
                   ),
                   'pre': Style(
-                    backgroundColor: theme.colorScheme.surfaceVariant,
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
                     padding: HtmlPaddings.all(12),
                     whiteSpace: WhiteSpace.pre,
                   ),
@@ -1025,7 +1027,7 @@ class _NotesSection extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+                  color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(

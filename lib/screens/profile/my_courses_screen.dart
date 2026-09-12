@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 // ─── Models ──────────────────────────────────────────────────────────────────
 
@@ -12,7 +13,7 @@ class CourseItem {
   final String? category;
   final double? rating;
   final int? totalLessons;
-  final DateTime? lastAccessedAt;
+  final String? lastAccessedAt;
 
   const CourseItem({
     required this.id,
@@ -38,9 +39,7 @@ class CourseItem {
       category: json['category'] as String?,
       rating: (json['rating'] as num?)?.toDouble(),
       totalLessons: json['totalLessons'] as int?,
-      lastAccessedAt: json['lastAccessedAt'] != null
-          ? DateTime.tryParse(json['lastAccessedAt'] as String)
-          : null,
+      lastAccessedAt: json['lastAccessedAt'] as String?,
     );
   }
 }
@@ -122,8 +121,8 @@ class MyCoursesProvider extends ChangeNotifier {
     switch (_sortBy) {
       case 'recent':
         _filteredCourses.sort((a, b) {
-          final aDate = a.lastAccessedAt ?? DateTime(2000);
-          final bDate = b.lastAccessedAt ?? DateTime(2000);
+          final aDate = DateTime.tryParse(a.lastAccessedAt ?? '') ?? DateTime(2000);
+          final bDate = DateTime.tryParse(b.lastAccessedAt ?? '') ?? DateTime(2000);
           return bDate.compareTo(aDate);
         });
         break;

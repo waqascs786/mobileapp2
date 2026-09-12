@@ -194,3 +194,64 @@ class ShimmerLoading extends StatelessWidget {
     );
   }
 }
+
+class ShimmerCard extends StatelessWidget {
+  final double? width;
+  final double? height;
+
+  const ShimmerCard({super.key, this.width, this.height});
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
+}
+
+class ShimmerListTile extends StatelessWidget {
+  const ShimmerListTile({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(height: 14, width: 180, color: Colors.white),
+                  const SizedBox(height: 8),
+                  Container(height: 12, width: 120, color: Colors.white),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

@@ -1,8 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../config/app_config.dart';
-import '../../models/course_model.dart';
-import '../../models/category_model.dart';
+import '../../models/course.dart';
 import '../../services/api_service.dart';
 import '../../widgets/course_card.dart';
 import '../../widgets/shimmer_loading.dart';
@@ -99,8 +98,9 @@ class _CourseListScreenState extends State<CourseListScreen> {
 
   Future<void> _loadCategories() async {
     try {
-      final categories = await ApiService.instance.getCategories();
-      if (mounted) setState(() => _categories = categories);
+      final result = await ApiService.instance.getCategories();
+      final cats = result.map((e) => Category.fromJson(e)).toList();
+      if (mounted) setState(() => _categories = cats);
     } catch (_) {}
   }
 
@@ -109,7 +109,7 @@ class _CourseListScreenState extends State<CourseListScreen> {
       setState(() {
         _currentPage = 1;
         _hasMore = true;
-        if (refresh) _courses = [];
+        _courses = [];
       });
     }
 
@@ -258,7 +258,7 @@ class _CourseListScreenState extends State<CourseListScreen> {
                             border: Border.all(
                               color: isActive
                                   ? config.primaryColor
-                                  : Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                                  : Theme.of(context).colorScheme.outline.withOpacity(0.2),
                             ),
                           ),
                           child: Center(
@@ -304,13 +304,13 @@ class _CourseListScreenState extends State<CourseListScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: _selectedCategory != null
-              ? config.primaryColor.withValues(alpha: 0.1)
+              ? config.primaryColor.withOpacity(0.1)
               : Theme.of(context).colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: _selectedCategory != null
-                ? config.primaryColor.withValues(alpha: 0.3)
-                : Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                ? config.primaryColor.withOpacity(0.3)
+                : Theme.of(context).colorScheme.outline.withOpacity(0.2),
           ),
         ),
         child: Row(
@@ -321,7 +321,7 @@ class _CourseListScreenState extends State<CourseListScreen> {
               size: 18,
               color: _selectedCategory != null
                   ? config.primaryColor
-                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                  : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
             ),
             const SizedBox(width: 4),
             Text(
@@ -331,7 +331,7 @@ class _CourseListScreenState extends State<CourseListScreen> {
                 fontWeight: FontWeight.w500,
                 color: _selectedCategory != null
                     ? config.primaryColor
-                    : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
               ),
             ),
           ],
@@ -357,7 +357,7 @@ class _CourseListScreenState extends State<CourseListScreen> {
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                  color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -376,7 +376,7 @@ class _CourseListScreenState extends State<CourseListScreen> {
                 leading: Icon(Icons.all_inclusive, color: config.primaryColor),
                 title: const Text('All Categories'),
                 selected: _selectedCategory == null,
-                selectedTileColor: config.primaryColor.withValues(alpha: 0.1),
+                selectedTileColor: config.primaryColor.withOpacity(0.1),
                 onTap: () {
                   _onCategoryChanged(null);
                   Navigator.pop(context);
@@ -386,7 +386,7 @@ class _CourseListScreenState extends State<CourseListScreen> {
                     leading: Icon(_getCategoryIcon(cat.name), color: config.primaryColor),
                     title: Text(cat.name),
                     selected: _selectedCategory?.id == cat.id,
-                    selectedTileColor: config.primaryColor.withValues(alpha: 0.1),
+                    selectedTileColor: config.primaryColor.withOpacity(0.1),
                     onTap: () {
                       _onCategoryChanged(cat);
                       Navigator.pop(context);
@@ -445,11 +445,20 @@ class _CourseListScreenState extends State<CourseListScreen> {
               (context, index) {
                 final course = _courses[index];
                 return CourseCard(
-                  course: course,
-                  primaryColor: config.primaryColor,
+                  thumbnailUrl: course.thumbnail,
+                  title: course.title,
+                  instructorName: course.instructor.name,
+                  rating: course.rating,
+                  ratingCount: course.ratingCount,
+                  price: course.price,
+                  salePrice: course.salePrice,
+                  isFree: course.isFree,
+                  progress: course.isEnrolled ? course.progress : null,
+                  isEnrolled: course.isEnrolled,
+                  mode: CourseCardMode.grid,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => CourseDetailScreen(courseId: course.id),
+                      builder: (_) => CourseDetailScreen(courseId: course.id.toString()),
                     ),
                   ),
                 );
@@ -481,12 +490,21 @@ class _CourseListScreenState extends State<CourseListScreen> {
           separatorBuilder: (_, __) => const SizedBox(height: 12),
           itemBuilder: (context, index) {
             final course = _courses[index];
-            return CourseListTile(
-              course: course,
-              primaryColor: config.primaryColor,
+            return CourseCard(
+              thumbnailUrl: course.thumbnail,
+              title: course.title,
+              instructorName: course.instructor.name,
+              rating: course.rating,
+              ratingCount: course.ratingCount,
+              price: course.price,
+              salePrice: course.salePrice,
+              isFree: course.isFree,
+              progress: course.isEnrolled ? course.progress : null,
+              isEnrolled: course.isEnrolled,
+              mode: CourseCardMode.list,
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => CourseDetailScreen(courseId: course.id),
+                  builder: (_) => CourseDetailScreen(courseId: course.id.toString()),
                 ),
               ),
             );
@@ -515,7 +533,7 @@ class _CourseListScreenState extends State<CourseListScreen> {
         childAspectRatio: 0.72,
       ),
       itemCount: 6,
-      itemBuilder: (_, __) => const ShimmerCard(height: 260),
+      itemBuilder: (_, __) => const CourseCardShimmer(mode: CourseCardMode.grid),
     );
   }
 
@@ -525,7 +543,7 @@ class _CourseListScreenState extends State<CourseListScreen> {
       physics: const NeverScrollableScrollPhysics(),
       itemCount: 6,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (_, __) => const ShimmerListTile(),
+      itemBuilder: (_, __) => const CourseCardShimmer(mode: CourseCardMode.list),
     );
   }
 
@@ -539,7 +557,7 @@ class _CourseListScreenState extends State<CourseListScreen> {
             Icon(
               Icons.search_off_rounded,
               size: 80,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.15),
             ),
             const SizedBox(height: 16),
             Text(
@@ -556,7 +574,7 @@ class _CourseListScreenState extends State<CourseListScreen> {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
               ),
             ),
             const SizedBox(height: 24),

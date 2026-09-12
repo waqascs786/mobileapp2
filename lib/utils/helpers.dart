@@ -121,8 +121,8 @@ void showLoadingDialog(BuildContext context) {
   showDialog(
     context: context,
     barrierDismissible: false,
-    builder: (context) => WillPopScope(
-      onWillPop: () async => false,
+    builder: (context) => PopScope(
+      canPop: false,
       child: const Center(
         child: CircularProgressIndicator(),
       ),

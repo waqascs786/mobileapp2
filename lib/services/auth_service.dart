@@ -5,7 +5,27 @@ import 'package:flutter/foundation.dart';
 import 'api_service.dart';
 import 'storage_service.dart';
 
+class AuthResult {
+  final bool isSuccess;
+  final String? errorMessage;
+
+  const AuthResult({required this.isSuccess, this.errorMessage});
+}
+
 class AuthService extends ChangeNotifier {
+  static AuthService? _staticInstance;
+
+  static AuthService get instance {
+    if (_staticInstance == null) {
+      throw StateError('AuthService not initialized. Call setInstance() first.');
+    }
+    return _staticInstance!;
+  }
+
+  static void setInstance(AuthService svc) {
+    _staticInstance = svc;
+  }
+
   final ApiService _apiService;
   final StorageService _storageService;
 
@@ -30,6 +50,12 @@ class AuthService extends ChangeNotifier {
   String get userEmail => _user?['email'] as String? ?? '';
   String get userAvatar => _user?['avatar'] as String? ?? '';
   int get userId => _user?['id'] as int? ?? 0;
+
+  Future<Map<String, dynamic>?> get currentUser async {
+    if (_user != null) return _user;
+    await refreshProfile();
+    return _user;
+  }
 
   Future<void> autoLogin() async {
     final savedToken = _storageService.getString('auth_token');
@@ -60,13 +86,16 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  Future<bool> login(String email, String password) async {
+  Future<bool> login({
+    required String email,
+    required String password,
+  }) async {
     try {
       _isLoading = true;
       _error = null;
       notifyListeners();
 
-      final result = await _apiService.login(email, password);
+      final result = await _apiService.login(email: email, password: password);
       _user = result['user'] as Map<String, dynamic>?;
       _isAuthenticated = true;
 
@@ -89,13 +118,57 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  Future<bool> register(String name, String email, String password) async {
+  Future<bool> loginWithGoogle() async {
     try {
       _isLoading = true;
       _error = null;
       notifyListeners();
 
-      final result = await _apiService.register(name, email, password);
+      return false;
+    } catch (e) {
+      _error = e.toString();
+      _log('Google login failed: $e');
+      notifyListeners();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> loginWithFacebook() async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      return false;
+    } catch (e) {
+      _error = e.toString();
+      _log('Facebook login failed: $e');
+      notifyListeners();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<AuthResult> register({
+    required String name,
+    required String email,
+    required String password,
+  }) async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final result = await _apiService.register(
+        name: name,
+        email: email,
+        password: password,
+      );
       _user = result['user'] as Map<String, dynamic>?;
       _isAuthenticated = true;
 
@@ -105,13 +178,13 @@ class AuthService extends ChangeNotifier {
       );
 
       notifyListeners();
-      return true;
+      return const AuthResult(isSuccess: true);
     } catch (e) {
       _error = e.toString();
       _isAuthenticated = false;
       _log('Registration failed: $e');
       notifyListeners();
-      return false;
+      return AuthResult(isSuccess: false, errorMessage: e.toString());
     } finally {
       _isLoading = false;
       notifyListeners();

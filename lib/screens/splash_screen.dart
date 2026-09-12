@@ -6,6 +6,7 @@ import 'auth/login_screen.dart';
 import 'home/home_screen.dart';
 
 class SplashScreen extends StatefulWidget {
+  static const route = '/';
   const SplashScreen({super.key});
 
   @override
@@ -90,7 +91,7 @@ class _SplashScreenState extends State<SplashScreen>
             end: Alignment.bottomRight,
             colors: [
               config.primaryColor,
-              config.primaryColor.withValues(alpha: 0.7),
+              config.primaryColor.withOpacity(0.7),
               config.primaryColorDark,
             ],
           ),
@@ -113,7 +114,7 @@ class _SplashScreenState extends State<SplashScreen>
                       borderRadius: BorderRadius.circular(32),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.2),
+                          color: Colors.black.withOpacity(0.2),
                           blurRadius: 30,
                           offset: const Offset(0, 10),
                         ),
@@ -157,7 +158,7 @@ class _SplashScreenState extends State<SplashScreen>
                         style: TextStyle(
                           fontSize: size.width * 0.04,
                           fontWeight: FontWeight.w300,
-                          color: Colors.white.withValues(alpha: 0.85),
+                          color: Colors.white.withOpacity(0.85),
                           letterSpacing: 1.0,
                         ),
                       ),
@@ -174,7 +175,7 @@ class _SplashScreenState extends State<SplashScreen>
                   child: CircularProgressIndicator(
                     strokeWidth: 2.5,
                     valueColor: AlwaysStoppedAnimation<Color>(
-                      Colors.white.withValues(alpha: 0.8),
+                      Colors.white.withOpacity(0.8),
                     ),
                   ),
                 ),
