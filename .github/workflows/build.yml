@@ -99,11 +99,11 @@ jobs:
       - name: Analyze code
         run: flutter analyze
 
-      - name: Build iOS
-        run: flutter build ios --release --no-codesign
+      - name: Build iOS Simulator
+        run: flutter build ios --simulator
 
       - name: Create iOS build zip
-        run: cd build/ios/iphoneos && zip -r ios-build-${{ env.BUILD_NUMBER }}.zip ./
+        run: cd build/ios/iphonesimulator && zip -r ios-build-${{ env.BUILD_NUMBER }}.zip ./
 
       - name: Upload iOS artifact
         uses: actions/upload-artifact@v4
