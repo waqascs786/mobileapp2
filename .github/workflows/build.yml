@@ -75,6 +75,7 @@ jobs:
           cp /tmp/pagepilot_pubspec.lock pubspec.lock 2>/dev/null || true
           cp /tmp/pagepilot_analysis.yaml analysis_options.yaml 2>/dev/null || true
           rm -rf test/
+          sed -i 's/id "org.jetbrains.kotlin.android" version ".*"/id "org.jetbrains.kotlin.android" version "2.0.0"/' android/settings.gradle
 
       - name: Restore Dart code
         run: |
