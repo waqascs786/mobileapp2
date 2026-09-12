@@ -1,9 +1,9 @@
+import '../config/app_config.dart';
+
 class ApiConfig {
   ApiConfig._();
 
-  static const String _baseUrl = 'https://api.pagepilot.com/v1';
-
-  static String get baseUrl => _baseUrl;
+  static String get baseUrl => AppConfig.instance.apiBaseUrl;
 
   static const Map<String, String> endpoints = {
     'courses': '/courses',
@@ -38,7 +38,7 @@ class ApiConfig {
       });
     }
 
-    return '$_baseUrl$endpoint';
+    return '$baseUrl$endpoint';
   }
 
   static Map<String, String> authHeaders({String? token}) {

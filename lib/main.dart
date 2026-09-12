@@ -17,17 +17,23 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
+  await AppConfig.load();
+
   final storageService = StorageService();
   await storageService.init();
 
   final apiService = ApiService(storageService: storageService);
+  ApiService.setInstance(apiService);
+
   final authService = AuthService(
     apiService: apiService,
     storageService: storageService,
   );
+  AuthService.setInstance(authService);
 
-  await AppConfig.load();
-  await authService.autoLogin();
+  try {
+    await authService.autoLogin();
+  } catch (_) {}
 
   runApp(
     MultiProvider(
@@ -36,6 +42,7 @@ void main() async {
         Provider<ApiService>.value(value: apiService),
         Provider<StorageService>.value(value: storageService),
         Provider<NotificationService>.value(value: NotificationService()),
+        Provider<AppConfig>.value(value: AppConfig.instance),
       ],
       child: const PagePilotApp(),
     ),
