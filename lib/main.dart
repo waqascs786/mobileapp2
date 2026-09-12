@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
@@ -12,15 +14,25 @@ import 'services/notification_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  FlutterError.onError = (details) {
+    if (kDebugMode) {
+      FlutterError.presentError(details);
+    }
+  };
+
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  await AppConfig.load();
+  try {
+    await AppConfig.load();
+  } catch (_) {}
 
   final storageService = StorageService();
-  await storageService.init();
+  try {
+    await storageService.init();
+  } catch (_) {}
 
   final apiService = ApiService(storageService: storageService);
   ApiService.setInstance(apiService);
@@ -35,16 +47,22 @@ void main() async {
     await authService.autoLogin();
   } catch (_) {}
 
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider.value(value: authService),
-        Provider<ApiService>.value(value: apiService),
-        Provider<StorageService>.value(value: storageService),
-        Provider<NotificationService>.value(value: NotificationService()),
-        Provider<AppConfig>.value(value: AppConfig.instance),
-      ],
-      child: const PagePilotApp(),
-    ),
-  );
+  runZonedGuarded(() {
+    runApp(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: authService),
+          Provider<ApiService>.value(value: apiService),
+          Provider<StorageService>.value(value: storageService),
+          Provider<NotificationService>.value(value: NotificationService()),
+          Provider<AppConfig>.value(value: AppConfig.instance),
+        ],
+        child: const PagePilotApp(),
+      ),
+    );
+  }, (error, stack) {
+    if (kDebugMode) {
+      debugPrint('Uncaught error: $error');
+    }
+  });
 }

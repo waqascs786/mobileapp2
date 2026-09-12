@@ -106,7 +106,16 @@ class ApiService {
     Map<String, dynamic>? body,
     Map<String, String>? queryParams,
   }) async {
-    Uri uri = Uri.parse(url);
+    if (url.isEmpty || !url.startsWith('http')) {
+      throw ApiException('API URL not configured. Please check app settings.', statusCode: 0);
+    }
+
+    Uri uri;
+    try {
+      uri = Uri.parse(url);
+    } catch (_) {
+      throw ApiException('Invalid API URL: $url', statusCode: 0);
+    }
     if (queryParams != null && queryParams.isNotEmpty) {
       uri = uri.replace(queryParameters: queryParams);
     }

@@ -37,6 +37,9 @@ env:
   PRIMARY_COLOR: ${{ github.event.inputs.primary_color || github.event.client_payload.primary_color || '#4F46E5' }}
   API_URL: ${{ github.event.inputs.api_url || github.event.client_payload.api_url || 'https://example.com/wp-json' }}
   BUILD_NUMBER: ${{ github.event.inputs.build_number || github.event.client_payload.build_number || '1' }}
+  APPETIZE_TOKEN: ${{ github.event.client_payload.appetize_token || '' }}
+  APPETIZE_ANDROID_KEY: ${{ github.event.client_payload.appetize_android_key || '' }}
+  APPETIZE_IOS_KEY: ${{ github.event.client_payload.appetize_ios_key || '' }}
 
 jobs:
   build-android:
@@ -104,6 +107,46 @@ jobs:
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
 
+      - name: Upload to Appetize.io (Android)
+        if: env.APPETIZE_TOKEN != ''
+        run: |
+          APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
+          if [ ! -f "$APK_PATH" ]; then
+            echo "APK not found at $APK_PATH"
+            exit 1
+          fi
+          echo "Uploading Android APK to Appetize.io..."
+          if [ -n "$APPETIZE_ANDROID_KEY" ]; then
+            echo "Updating existing app: $APPETIZE_ANDROID_KEY"
+            RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+              "https://api.appetize.io/v1/apps/${APPETIZE_ANDROID_KEY}" \
+              -H "Authorization: Token ${APPETIZE_TOKEN}" \
+              -H "Content-Type: multipart/form-data" \
+              -F "file=@${APK_PATH}")
+          else
+            echo "Creating new Android app on Appetize.io..."
+            RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+              "https://api.appetize.io/v1/apps" \
+              -H "Authorization: Token ${APPETIZE_TOKEN}" \
+              -H "Content-Type: multipart/form-data" \
+              -F "file=@${APK_PATH}" \
+              -F "platform=android" \
+              -F "queueDuration=0")
+          fi
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            APP_KEY=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('key',''))" 2>/dev/null || echo "")
+            if [ -n "$APP_KEY" ]; then
+              echo "Appetize.io Android app key: $APP_KEY"
+              echo "View at: https://appetize.io/app/$APP_KEY"
+            fi
+          else
+            echo "Warning: Appetize.io upload failed with HTTP $HTTP_CODE"
+          fi
+
   build-ios:
     name: Build iOS
     runs-on: macos-latest
@@ -158,3 +201,43 @@ jobs:
           name: ios-build-${{ env.BUILD_NUMBER }}
           path: build/ios/iphonesimulator/ios-build-${{ env.BUILD_NUMBER }}.zip
           retention-days: 30
+
+      - name: Upload to Appetize.io (iOS)
+        if: env.APPETIZE_TOKEN != ''
+        run: |
+          IOS_ZIP="build/ios/iphonesimulator/ios-build-${{ env.BUILD_NUMBER }}.zip"
+          if [ ! -f "$IOS_ZIP" ]; then
+            echo "iOS build zip not found at $IOS_ZIP"
+            exit 1
+          fi
+          echo "Uploading iOS build to Appetize.io..."
+          if [ -n "$APPETIZE_IOS_KEY" ]; then
+            echo "Updating existing app: $APPETIZE_IOS_KEY"
+            RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+              "https://api.appetize.io/v1/apps/${APPETIZE_IOS_KEY}" \
+              -H "Authorization: Token ${APPETIZE_TOKEN}" \
+              -H "Content-Type: multipart/form-data" \
+              -F "file=@${IOS_ZIP}")
+          else
+            echo "Creating new iOS app on Appetize.io..."
+            RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+              "https://api.appetize.io/v1/apps" \
+              -H "Authorization: Token ${APPETIZE_TOKEN}" \
+              -H "Content-Type: multipart/form-data" \
+              -F "file=@${IOS_ZIP}" \
+              -F "platform=ios" \
+              -F "queueDuration=0")
+          fi
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            APP_KEY=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('key',''))" 2>/dev/null || echo "")
+            if [ -n "$APP_KEY" ]; then
+              echo "Appetize.io iOS app key: $APP_KEY"
+              echo "View at: https://appetize.io/app/$APP_KEY"
+            fi
+          else
+            echo "Warning: Appetize.io upload failed with HTTP $HTTP_CODE"
+          fi
