@@ -157,7 +157,7 @@ jobs:
 
           # Update android/app/build.gradle to use release signing.
           GRADLE_FILE="android/app/build.gradle"
-          sed -i '/signingConfigs {/,$d' "$GRADLE_FILE"
+          sed -i '/buildTypes {/,$d' "$GRADLE_FILE"
 
           cat >> "$GRADLE_FILE" <<'GRADLE'
               signingConfigs {
