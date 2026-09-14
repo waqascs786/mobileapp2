@@ -49,7 +49,11 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
       final data = await ApiService.instance.getCourse(widget.courseId);
       if (!mounted) return;
       final courseData = data['data'] ?? data;
-      final course = Course.fromJson(courseData as Map<String, dynamic>);
+      if (courseData is! Map<String, dynamic>) {
+        throw Exception('Invalid course data format');
+      }
+      final course = Course.fromJson(courseData);
+      if (!mounted) return;
       setState(() {
         _course = course;
         _isWishlisted = course.isWishlisted;
