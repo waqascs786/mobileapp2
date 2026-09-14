@@ -96,13 +96,14 @@ class AuthService extends ChangeNotifier {
       notifyListeners();
 
       final result = await _apiService.login(email: email, password: password);
-      _user = result['user'] as Map<String, dynamic>?;
-      _isAuthenticated = true;
-
-      await _storageService.saveString(
-        'user_data',
-        _user.toString(),
-      );
+      if (result['success'] == true && result['data'] != null) {
+        final data = result['data'] as Map<String, dynamic>;
+        _user = data;
+        _isAuthenticated = true;
+        await _storageService.saveString('user_data', data.toString());
+      } else {
+        throw Exception(result['message'] as String? ?? 'Login failed');
+      }
 
       notifyListeners();
       return true;
@@ -169,13 +170,14 @@ class AuthService extends ChangeNotifier {
         email: email,
         password: password,
       );
-      _user = result['user'] as Map<String, dynamic>?;
-      _isAuthenticated = true;
-
-      await _storageService.saveString(
-        'user_data',
-        _user.toString(),
-      );
+      if (result['success'] == true && result['data'] != null) {
+        final data = result['data'] as Map<String, dynamic>;
+        _user = data;
+        _isAuthenticated = true;
+        await _storageService.saveString('user_data', data.toString());
+      } else {
+        return AuthResult(isSuccess: false, errorMessage: result['message'] as String? ?? 'Registration failed');
+      }
 
       notifyListeners();
       return const AuthResult(isSuccess: true);

@@ -51,8 +51,20 @@ class ApiService {
         _maxRetries = maxRetries;
 
   String? get _token => _storageService.getString('auth_token');
+  String? get _userId => _storageService.getString('user_id');
+  String? get _username => _storageService.getString('username');
 
-  Map<String, String> get _headers => ApiConfig.buildHeaders(token: _token);
+  Map<String, String> get _headers {
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    if (_token != null && _token!.isNotEmpty) {
+      headers['X-PagePilot-User'] = _username ?? '';
+      headers['X-PagePilot-Token'] = _token!;
+    }
+    return headers;
+  }
 
   Future<Map<String, dynamic>> get(
     String endpointKey, {
@@ -231,7 +243,7 @@ class ApiService {
     final courses = list
         .map((e) => Course.fromJson(e as Map<String, dynamic>))
         .toList();
-    final hasMore = result['hasMore'] as bool? ?? false;
+    final hasMore = result['hasMore'] as bool? ?? result['has_more'] as bool? ?? false;
     return CourseListResult(courses: courses, hasMore: hasMore);
   }
 
@@ -246,8 +258,15 @@ class ApiService {
   }
 
   Future<List<Course>> getEnrolledCourses() async {
-    final result = await getCourses();
-    return result.courses;
+    try {
+      final result = await get('enrolledCourses');
+      final list = result['data'] as List<dynamic>? ?? [];
+      return list
+          .map((e) => Course.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   Future<Map<String, dynamic>> getCourseDetail(int courseId) async {
@@ -255,12 +274,12 @@ class ApiService {
   }
 
   Future<List<dynamic>> getCourseReviews(int courseId) async {
-    final result = await get('courseDetail', pathParams: {'id': courseId.toString()});
-    return result['reviews'] as List<dynamic>? ?? [];
+    final result = await get('courseReviews', pathParams: {'id': courseId.toString()});
+    return result['data'] as List<dynamic>? ?? [];
   }
 
   Future<void> enrollCourse(int courseId) async {
-    await post('courseDetail', pathParams: {'id': courseId.toString()});
+    await post('courseEnroll', pathParams: {'id': courseId.toString()});
   }
 
   Future<List<Map<String, dynamic>>> getCategories() async {
@@ -274,17 +293,17 @@ class ApiService {
   }
 
   Future<List<dynamic>> getLessons(String courseId) async {
-    final result = await get('lessons', pathParams: {'courseId': courseId});
+    final result = await get('courseCurriculum', pathParams: {'id': courseId});
     return result['data'] as List<dynamic>? ?? [];
   }
 
   Future<List<dynamic>> getQuizzes(String courseId) async {
-    final result = await get('quizzes', pathParams: {'courseId': courseId});
+    final result = await get('courseCurriculum', pathParams: {'id': courseId});
     return result['data'] as List<dynamic>? ?? [];
   }
 
   Future<Map<String, dynamic>> getCourseProgress(String courseId) async {
-    return get('progress', pathParams: {'courseId': courseId});
+    return get('courseProgress', pathParams: {'id': courseId});
   }
 
   Future<Map<String, dynamic>> updateProgress(
@@ -292,8 +311,8 @@ class ApiService {
     Map<String, dynamic> progressData,
   ) async {
     return post(
-      'progressUpdate',
-      pathParams: {'courseId': courseId},
+      'courseProgress',
+      pathParams: {'id': courseId},
       body: progressData,
     );
   }
@@ -305,12 +324,24 @@ class ApiService {
     required String password,
   }) async {
     final result = await post('auth', body: {
-      'email': email,
+      'username': email,
       'password': password,
     });
 
-    if (result['token'] != null) {
-      await _storageService.saveString('auth_token', result['token'] as String);
+    if (result['success'] == true && result['data'] != null) {
+      final data = result['data'] as Map<String, dynamic>;
+      final token = data['token'] as String?;
+      final userId = data['id']?.toString();
+      final username = data['username'] as String?;
+      if (token != null) {
+        await _storageService.saveString('auth_token', token);
+      }
+      if (userId != null) {
+        await _storageService.saveString('user_id', userId);
+      }
+      if (username != null) {
+        await _storageService.saveString('username', username);
+      }
     }
 
     return result;
@@ -321,14 +352,31 @@ class ApiService {
     required String email,
     required String password,
   }) async {
+    final nameParts = name.split(' ');
+    final firstName = nameParts.first;
+    final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
     final result = await post('register', body: {
-      'name': name,
+      'username': email.split('@').first,
       'email': email,
       'password': password,
+      'first_name': firstName,
+      'last_name': lastName,
     });
 
-    if (result['token'] != null) {
-      await _storageService.saveString('auth_token', result['token'] as String);
+    if (result['success'] == true && result['data'] != null) {
+      final data = result['data'] as Map<String, dynamic>;
+      final token = data['token'] as String?;
+      final userId = data['id']?.toString();
+      final username = data['username'] as String?;
+      if (token != null) {
+        await _storageService.saveString('auth_token', token);
+      }
+      if (userId != null) {
+        await _storageService.saveString('user_id', userId);
+      }
+      if (username != null) {
+        await _storageService.saveString('username', username);
+      }
     }
 
     return result;
@@ -342,7 +390,11 @@ class ApiService {
   // ── Profile endpoints ──
 
   Future<Map<String, dynamic>> getProfile() async {
-    return get('profile');
+    final result = await get('profile');
+    if (result['success'] == true && result['data'] != null) {
+      return result['data'] as Map<String, dynamic>;
+    }
+    return result;
   }
 
   Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
@@ -357,10 +409,10 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> addToWishlist(String courseId) async {
-    return post('wishlistAdd', pathParams: {'courseId': courseId});
+    return post('wishlistItem', pathParams: {'id': courseId});
   }
 
   Future<Map<String, dynamic>> removeFromWishlist(String courseId) async {
-    return delete('wishlistRemove', pathParams: {'courseId': courseId});
+    return delete('wishlistItem', pathParams: {'id': courseId});
   }
 }
