@@ -213,14 +213,14 @@ jobs:
             echo "Updating existing app: $APPETIZE_ANDROID_KEY"
             RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
               "https://api.appetize.io/v1/apps/${APPETIZE_ANDROID_KEY}" \
-              -H "Authorization: Token ${APPETIZE_TOKEN}" \
+              -H "X-API-KEY: ${APPETIZE_TOKEN}" \
               -H "Content-Type: multipart/form-data" \
               -F "file=@${APK_PATH}")
           else
             echo "Creating new Android app on Appetize.io..."
             RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
               "https://api.appetize.io/v1/apps" \
-              -H "Authorization: Token ${APPETIZE_TOKEN}" \
+              -H "X-API-KEY: ${APPETIZE_TOKEN}" \
               -H "Content-Type: multipart/form-data" \
               -F "file=@${APK_PATH}" \
               -F "platform=android" \
@@ -312,14 +312,14 @@ jobs:
             echo "Updating existing app: $APPETIZE_IOS_KEY"
             RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
               "https://api.appetize.io/v1/apps/${APPETIZE_IOS_KEY}" \
-              -H "Authorization: Token ${APPETIZE_TOKEN}" \
+              -H "X-API-KEY: ${APPETIZE_TOKEN}" \
               -H "Content-Type: multipart/form-data" \
               -F "file=@${IOS_ZIP}")
           else
             echo "Creating new iOS app on Appetize.io..."
             RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
               "https://api.appetize.io/v1/apps" \
-              -H "Authorization: Token ${APPETIZE_TOKEN}" \
+              -H "X-API-KEY: ${APPETIZE_TOKEN}" \
               -H "Content-Type: multipart/form-data" \
               -F "file=@${IOS_ZIP}" \
               -F "platform=ios" \
