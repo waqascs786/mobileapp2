@@ -53,7 +53,7 @@ jobs:
   build-android:
     name: Build Android APK
     runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.platform == 'android' || github.event.client_payload.platform == 'android' }}
+    if: ${{ env.PLATFORM == 'android' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -247,7 +247,7 @@ jobs:
   build-ios:
     name: Build iOS Simulator
     runs-on: macos-latest
-    if: ${{ github.event.inputs.platform == 'ios' || github.event.client_payload.platform == 'ios' }}
+    if: ${{ env.PLATFORM == 'ios' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

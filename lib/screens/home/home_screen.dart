@@ -25,6 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Course> _featuredCourses = [];
   List<Course> _popularCourses = [];
   List<Course> _enrolledCourses = [];
+  List<Map<String, dynamic>> _categories = [];
   bool _isLoadingFeatured = true;
   bool _isLoadingPopular = true;
 
@@ -33,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadUserData();
     _loadCourses();
+    _loadCategories();
   }
 
   Future<void> _loadUserData() async {
@@ -80,8 +82,17 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _loadCategories() async {
+    try {
+      final categories = await ApiService.instance.getCategories();
+      if (mounted) setState(() => _categories = categories);
+    } catch (_) {
+    }
+  }
+
   Future<void> _onRefresh() async {
     await _loadCourses();
+    await _loadCategories();
   }
 
   void _onTabTapped(int index) {
@@ -349,7 +360,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCategoriesGrid(AppConfig config) {
-    final categories = config.categories;
+    final categories = _categories;
 
     if (categories.isEmpty) {
       return _buildEmptySection('No categories available');
@@ -369,6 +380,7 @@ class _HomeScreenState extends State<HomeScreen> {
         itemCount: categories.length,
         itemBuilder: (context, index) {
           final category = categories[index];
+          final categoryName = category['name'] as String? ?? '';
           return GestureDetector(
             onTap: () {
               setState(() => _currentTabIndex = 1);
@@ -385,13 +397,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    _getCategoryIcon(category.name),
+                    _getCategoryIcon(categoryName),
                     size: 32,
                     color: config.primaryColor,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    category.name,
+                    categoryName,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 12,
