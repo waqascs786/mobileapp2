@@ -102,22 +102,17 @@ jobs:
 
       # Android release keystore: decode from secret if available, else generate a new one.
       - name: Setup Android signing keystore
-        env:
-          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          STORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS_SECRET: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASS_SECRET: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           KEYSTORE_DIR="$HOME/.android-keystore"
           mkdir -p "$KEYSTORE_DIR"
           KEYSTORE_PATH="$KEYSTORE_DIR/release-key.jks"
 
-          if [ -n "$KEYSTORE_B64" ]; then
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
             echo "Decoding existing keystore from repository secret..."
-            echo "$KEYSTORE_B64" | base64 -d > "$KEYSTORE_PATH"
-            KEYSTORE_PASSWORD="$STORE_PASS"
-            KEY_ALIAS="${KEY_ALIAS_SECRET:-pagepilot}"
-            KEY_PASSWORD="$KEY_PASS_SECRET"
+            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$KEYSTORE_PATH"
+            KEYSTORE_PASSWORD="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
+            KEY_ALIAS="${{ secrets.ANDROID_KEY_ALIAS:-pagepilot }}"
+            KEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}"
           else
             echo "No keystore found in secrets. Generating a new one..."
             KEYSTORE_PASSWORD=$(openssl rand -base64 32)
@@ -142,7 +137,6 @@ jobs:
           echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_ENV
           echo "KEY_ALIAS=$KEY_ALIAS" >> $GITHUB_ENV
           echo "KEY_PASSWORD=$KEY_PASSWORD" >> $GITHUB_ENV
-          echo "KEYSTORE_B64=$KEYSTORE_B64" >> $GITHUB_ENV
 
       - name: Configure Android release signing
         run: |
@@ -183,6 +177,10 @@ jobs:
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: Build Android APK (signed release)
+        env:
+          KEYSTORE_PASSWORD: ${{ env.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ env.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ env.KEY_PASSWORD }}
         run: flutter build apk --release
 
       - name: Upload Android artifact
@@ -194,7 +192,7 @@ jobs:
 
       # Save keystore as artifact so the user can download it and store as a secret.
       - name: Save keystore artifact (if newly generated)
-        if: env.KEYSTORE_B64 == ''
+        if: ${{ !secrets.ANDROID_KEYSTORE_BASE64 }}
         uses: actions/upload-artifact@v4
         with:
           name: android-keystore-${{ env.BUILD_NUMBER }}
