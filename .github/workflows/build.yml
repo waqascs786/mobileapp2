@@ -96,9 +96,13 @@ jobs:
 
       - name: Apply app config
         run: |
-          sed -i "s|com.example.pagepilot|${{ env.PACKAGE_NAME }}|g" android/app/build.gradle
-          sed -i "s|namespace = \"com.example.pagepilot\"|namespace = \"${{ env.PACKAGE_NAME }}\"|g" android/app/build.gradle
-          sed -i "s|applicationId = \"com.example.pagepilot\"|applicationId = \"${{ env.PACKAGE_NAME }}\"|g" android/app/build.gradle
+          sed -i "s|com.example.pagepilot_app|${{ env.PACKAGE_NAME }}|g" android/app/build.gradle
+          sed -i "s|namespace = \"com.example.pagepilot_app\"|namespace = \"${{ env.PACKAGE_NAME }}\"|g" android/app/build.gradle
+          sed -i "s|applicationId = \"com.example.pagepilot_app\"|applicationId = \"${{ env.PACKAGE_NAME }}\"|g" android/app/build.gradle
+          sed -i "s|com.example.pagepilot_app|${{ env.PACKAGE_NAME }}|g" android/app/src/main/AndroidManifest.xml
+          if ! grep -q "android.permission.INTERNET" android/app/src/main/AndroidManifest.xml; then
+            sed -i '/<manifest/a\    <uses-permission android:name="android.permission.INTERNET"/>' android/app/src/main/AndroidManifest.xml
+          fi
 
       # Android release keystore: decode from secret if available, else generate a new one.
       - name: Setup Android signing keystore

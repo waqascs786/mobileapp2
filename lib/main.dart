@@ -25,9 +25,7 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  try {
-    await AppConfig.load();
-  } catch (_) {}
+  AppConfig.load();
 
   final storageService = StorageService();
   try {
