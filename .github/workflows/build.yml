@@ -3,33 +3,37 @@ name: Build Mobile App
 on:
   workflow_dispatch:
     inputs:
+      platform:
+        description: 'Target platform (android/ios)'
+        required: true
+        default: 'android'
+        type: choice
+        options:
+          - android
+          - ios
       app_name:
         description: 'Application name'
-        required: true
+        required: false
         default: 'PagePilot'
       package_name:
-        description: 'Package name (e.g., com.example.app)'
-        required: true
+        description: 'Package name'
+        required: false
         default: 'com.pagepilot.app'
       primary_color:
         description: 'Primary color (hex)'
-        required: true
+        required: false
         default: '#4F46E5'
       api_url:
         description: 'WordPress API URL'
-        required: true
+        required: false
         default: 'https://example.com/wp-json'
       build_number:
         description: 'Build number'
-        required: true
+        required: false
         default: '1'
 
   repository_dispatch:
     types: [pagepilot_build]
-
-  push:
-    branches:
-      - main
 
 env:
   APP_NAME: ${{ github.event.inputs.app_name || github.event.client_payload.app_name || 'PagePilot' }}
@@ -37,14 +41,19 @@ env:
   PRIMARY_COLOR: ${{ github.event.inputs.primary_color || github.event.client_payload.primary_color || '#4F46E5' }}
   API_URL: ${{ github.event.inputs.api_url || github.event.client_payload.api_url || 'https://example.com/wp-json' }}
   BUILD_NUMBER: ${{ github.event.inputs.build_number || github.event.client_payload.build_number || '1' }}
+  PLATFORM: ${{ github.event.inputs.platform || github.event.client_payload.platform || 'android' }}
   APPETIZE_TOKEN: ${{ github.event.client_payload.appetize_token || '' }}
   APPETIZE_ANDROID_KEY: ${{ github.event.client_payload.appetize_android_key || '' }}
   APPETIZE_IOS_KEY: ${{ github.event.client_payload.appetize_ios_key || '' }}
 
 jobs:
+  # ===========================================================================
+  # Android Build — Signed release APK
+  # ===========================================================================
   build-android:
     name: Build Android APK
     runs-on: ubuntu-latest
+    if: env.PLATFORM == 'android'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -91,13 +100,87 @@ jobs:
           sed -i "s|namespace = \"com.example.pagepilot\"|namespace = \"${{ env.PACKAGE_NAME }}\"|g" android/app/build.gradle
           sed -i "s|applicationId = \"com.example.pagepilot\"|applicationId = \"${{ env.PACKAGE_NAME }}\"|g" android/app/build.gradle
 
+      # Android release keystore: decode from secret if available, else generate a new one.
+      - name: Setup Android signing keystore
+        run: |
+          KEYSTORE_DIR="$HOME/.android-keystore"
+          mkdir -p "$KEYSTORE_DIR"
+          KEYSTORE_PATH="$KEYSTORE_DIR/release-key.jks"
+
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "Decoding existing keystore from repository secret..."
+            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$KEYSTORE_PATH"
+            KEYSTORE_PASSWORD="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
+            KEY_ALIAS="${{ secrets.ANDROID_KEY_ALIAS:-pagepilot }}"
+            KEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}"
+          else
+            echo "No keystore found in secrets. Generating a new one..."
+            KEYSTORE_PASSWORD=$(openssl rand -base64 32)
+            KEY_ALIAS="pagepilot"
+            KEY_PASSWORD=$(openssl rand -base64 32)
+
+            keytool -genkey -v \
+              -keystore "$KEYSTORE_PATH" \
+              -alias "$KEY_ALIAS" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass "$KEYSTORE_PASSWORD" \
+              -keypass "$KEY_PASSWORD" \
+              -dname "CN=PagePilot, OU=Mobile, O=PagePilot, L=Unknown, ST=Unknown, C=US"
+
+            # Upload keystore as build artifact so user can download and save as secret.
+            echo "Keystore generated. Save as GitHub secret ANDROID_KEYSTORE_BASE64 for future builds."
+          fi
+
+          echo "KEYSTORE_PATH=$KEYSTORE_PATH" >> $GITHUB_ENV
+          echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_ENV
+          echo "KEY_ALIAS=$KEY_ALIAS" >> $GITHUB_ENV
+          echo "KEY_PASSWORD=$KEY_PASSWORD" >> $GITHUB_ENV
+
+      - name: Configure Android release signing
+        run: |
+          KEYSTORE_DIR="$HOME/.android-keystore"
+          # Write key.properties for Flutter/Gradle signing.
+          cat > "$KEYSTORE_DIR/key.properties" <<EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=$KEYSTORE_DIR/release-key.jks
+          EOF
+
+          # Update android/app/build.gradle to use release signing.
+          GRADLE_FILE="android/app/build.gradle"
+          sed -i '/signingConfigs {/,$d' "$GRADLE_FILE"
+
+          cat >> "$GRADLE_FILE" <<'GRADLE'
+              signingConfigs {
+                  release {
+                      storeFile file(System.getenv("HOME") + "/.android-keystore/release-key.jks")
+                      storePassword System.getenv("KEYSTORE_PASSWORD")
+                      keyAlias System.getenv("KEY_ALIAS")
+                      keyPassword System.getenv("KEY_PASSWORD")
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                  }
+              }
+          }
+          GRADLE
+
       - name: Get dependencies
         run: flutter pub get
 
       - name: Analyze code
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
-      - name: Build Android APK
+      - name: Build Android APK (signed release)
+        env:
+          KEYSTORE_PASSWORD: ${{ env.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ env.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ env.KEY_PASSWORD }}
         run: flutter build apk --release
 
       - name: Upload Android artifact
@@ -106,6 +189,15 @@ jobs:
           name: android-apk-${{ env.BUILD_NUMBER }}
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
+
+      # Save keystore as artifact so the user can download it and store as a secret.
+      - name: Save keystore artifact (if newly generated)
+        if: ${{ !secrets.ANDROID_KEYSTORE_BASE64 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-keystore-${{ env.BUILD_NUMBER }}
+          path: /home/runner/.android-keystore/release-key.jks
+          retention-days: 90
 
       - name: Upload to Appetize.io (Android)
         if: env.APPETIZE_TOKEN != ''
@@ -147,9 +239,13 @@ jobs:
             echo "Warning: Appetize.io upload failed with HTTP $HTTP_CODE"
           fi
 
+  # ===========================================================================
+  # iOS Build — Simulator build
+  # ===========================================================================
   build-ios:
-    name: Build iOS
+    name: Build iOS Simulator
     runs-on: macos-latest
+    if: env.PLATFORM == 'ios'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
