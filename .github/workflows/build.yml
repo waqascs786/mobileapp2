@@ -42,9 +42,9 @@ env:
   API_URL: ${{ github.event.inputs.api_url || github.event.client_payload.api_url || 'https://example.com/wp-json' }}
   BUILD_NUMBER: ${{ github.event.inputs.build_number || github.event.client_payload.build_number || '1' }}
   PLATFORM: ${{ github.event.inputs.platform || github.event.client_payload.platform || 'android' }}
-  APPETIZE_TOKEN: ${{ github.event.client_payload.appetize_token || '' }}
-  APPETIZE_ANDROID_KEY: ${{ github.event.client_payload.appetize_android_key || '' }}
-  APPETIZE_IOS_KEY: ${{ github.event.client_payload.appetize_ios_key || '' }}
+  APPETIZE_TOKEN: ${{ github.event.client_payload.appetize_token || secrets.APPETIZE_TOKEN || '' }}
+  APPETIZE_ANDROID_KEY: ${{ github.event.client_payload.appetize_android_key || secrets.APPETIZE_ANDROID_KEY || '' }}
+  APPETIZE_IOS_KEY: ${{ github.event.client_payload.appetize_ios_key || secrets.APPETIZE_IOS_KEY || '' }}
 
 jobs:
   # ===========================================================================
