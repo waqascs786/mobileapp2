@@ -120,11 +120,11 @@ jobs:
             KEY_PASSWORD="$KEY_PASS_SECRET"
           else
             echo "No keystore found in secrets. Generating a new one..."
-            KEYSTORE_PASSWORD=$(openssl rand -base64 32)
+            KEYSTORE_PASSWORD="pagepilot123"
             KEY_ALIAS="pagepilot"
-            KEY_PASSWORD=$(openssl rand -base64 32)
+            KEY_PASSWORD="pagepilot123"
 
-            keytool -genkey -v \
+            keytool -genkeypair -v \
               -keystore "$KEYSTORE_PATH" \
               -alias "$KEY_ALIAS" \
               -keyalg RSA \
@@ -134,7 +134,6 @@ jobs:
               -keypass "$KEY_PASSWORD" \
               -dname "CN=PagePilot, OU=Mobile, O=PagePilot, L=Unknown, ST=Unknown, C=US"
 
-            # Upload keystore as build artifact so user can download and save as secret.
             echo "Keystore generated. Save as GitHub secret ANDROID_KEYSTORE_BASE64 for future builds."
           fi
 
