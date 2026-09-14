@@ -82,27 +82,24 @@ jobs:
 
       - name: Generate Flutter scaffold
         run: |
-          flutter create --project-name pagepilot_app --org com.example --platforms android .
+          # Derive org and project name from PACKAGE_NAME (e.g. com.pagepilot.app -> org=com.pagepilot, project=app)
+          PKG="${{ env.PACKAGE_NAME }}"
+          LAST="${PKG##*.}"
+          ORG="${PKG%.$LAST}"
+          flutter create --project-name "$LAST" --org "$ORG" --platforms android .
           cp /tmp/pagepilot_pubspec.yaml pubspec.yaml
           cp /tmp/pagepilot_pubspec.lock pubspec.lock 2>/dev/null || true
           cp /tmp/pagepilot_analysis.yaml analysis_options.yaml 2>/dev/null || true
           rm -rf test/
           sed -i 's/id "org.jetbrains.kotlin.android" version ".*"/id "org.jetbrains.kotlin.android" version "2.0.0"/' android/settings.gradle
+          if ! grep -q "android.permission.INTERNET" android/app/src/main/AndroidManifest.xml; then
+            sed -i '/<manifest/a\    <uses-permission android:name="android.permission.INTERNET"/>' android/app/src/main/AndroidManifest.xml
+          fi
 
       - name: Restore Dart code
         run: |
           rm -rf lib
           cp -R /tmp/pagepilot_lib lib
-
-      - name: Apply app config
-        run: |
-          sed -i "s|com.example.pagepilot_app|${{ env.PACKAGE_NAME }}|g" android/app/build.gradle
-          sed -i "s|namespace = \"com.example.pagepilot_app\"|namespace = \"${{ env.PACKAGE_NAME }}\"|g" android/app/build.gradle
-          sed -i "s|applicationId = \"com.example.pagepilot_app\"|applicationId = \"${{ env.PACKAGE_NAME }}\"|g" android/app/build.gradle
-          sed -i "s|com.example.pagepilot_app|${{ env.PACKAGE_NAME }}|g" android/app/src/main/AndroidManifest.xml
-          if ! grep -q "android.permission.INTERNET" android/app/src/main/AndroidManifest.xml; then
-            sed -i '/<manifest/a\    <uses-permission android:name="android.permission.INTERNET"/>' android/app/src/main/AndroidManifest.xml
-          fi
 
       # Android release keystore: decode from secret if available, else generate a new one.
       - name: Setup Android signing keystore
