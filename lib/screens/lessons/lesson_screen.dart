@@ -9,8 +9,6 @@ import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:io';
 
-import 'package:url_launcher/url_launcher.dart';
-
 import '../../services/api_service.dart';
 
 // ─── Models ──────────────────────────────────────────────────────────────────
@@ -841,36 +839,21 @@ class _LessonVideoPlayer extends StatefulWidget {
 }
 
 class _LessonVideoPlayerState extends State<_LessonVideoPlayer> {
-  String? _youtubeId;
-  VideoPlayerController? _controller;
+  late VideoPlayerController _controller;
   bool _isInitialized = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _youtubeId = _extractYouTubeId(widget.url);
-    if (_youtubeId == null) {
-      _initDirectPlayer();
-    }
+    _initPlayer();
   }
 
-  String? _extractYouTubeId(String url) {
-    final patterns = [
-      RegExp(r'(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([A-Za-z0-9_-]{11})'),
-    ];
-    for (final p in patterns) {
-      final m = p.firstMatch(url);
-      if (m != null) return m.group(1);
-    }
-    return null;
-  }
-
-  Future<void> _initDirectPlayer() async {
+  Future<void> _initPlayer() async {
     try {
       _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
-      await _controller!.initialize();
-      _controller!.addListener(() {
+      await _controller.initialize();
+      _controller.addListener(() {
         if (mounted) setState(() {});
       });
       setState(() => _isInitialized = true);
@@ -881,53 +864,12 @@ class _LessonVideoPlayerState extends State<_LessonVideoPlayer> {
 
   @override
   void dispose() {
-    _controller?.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // YouTube: show thumbnail with play button
-    if (_youtubeId != null) {
-      return GestureDetector(
-        onTap: () async {
-          final url = Uri.parse('https://www.youtube.com/watch?v=$_youtubeId');
-          if (await canLaunchUrl(url)) {
-            await launchUrl(url, mode: LaunchMode.externalApplication);
-          }
-        },
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: AspectRatio(
-            aspectRatio: 16 / 9,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Image.network(
-                  'https://img.youtube.com/vi/$_youtubeId/0.jpg',
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: Colors.black87,
-                    child: const Icon(Icons.play_circle_outline, color: Colors.white54, size: 64),
-                  ),
-                ),
-                Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.black38,
-                    shape: BoxShape.circle,
-                  ),
-                  padding: const EdgeInsets.all(12),
-                  child: const Icon(Icons.play_arrow, color: Colors.white, size: 48),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    // Direct video URL
     if (_error != null) {
       return Container(
         height: 200,
@@ -948,7 +890,7 @@ class _LessonVideoPlayerState extends State<_LessonVideoPlayer> {
       );
     }
 
-    if (!_isInitialized || _controller == null) {
+    if (!_isInitialized) {
       return Container(
         height: 200,
         decoration: BoxDecoration(
@@ -961,7 +903,7 @@ class _LessonVideoPlayerState extends State<_LessonVideoPlayer> {
       );
     }
 
-    final aspectRatio = _controller!.value.aspectRatio;
+    final aspectRatio = _controller.value.aspectRatio;
     return Column(
       children: [
         ClipRRect(
@@ -971,15 +913,16 @@ class _LessonVideoPlayerState extends State<_LessonVideoPlayer> {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                VideoPlayer(_controller!),
+                VideoPlayer(_controller),
+                // Play/Pause overlay
                 GestureDetector(
                   onTap: () {
-                    _controller!.value.isPlaying
-                        ? _controller!.pause()
-                        : _controller!.play();
+                    _controller.value.isPlaying
+                        ? _controller.pause()
+                        : _controller.play();
                   },
                   child: AnimatedOpacity(
-                    opacity: _controller!.value.isPlaying ? 0.0 : 1.0,
+                    opacity: _controller.value.isPlaying ? 0.0 : 1.0,
                     duration: const Duration(milliseconds: 300),
                     child: Container(
                       decoration: const BoxDecoration(
@@ -987,7 +930,11 @@ class _LessonVideoPlayerState extends State<_LessonVideoPlayer> {
                         shape: BoxShape.circle,
                       ),
                       padding: const EdgeInsets.all(12),
-                      child: const Icon(Icons.play_arrow, color: Colors.white, size: 48),
+                      child: const Icon(
+                        Icons.play_arrow,
+                        color: Colors.white,
+                        size: 48,
+                      ),
                     ),
                   ),
                 ),
@@ -995,34 +942,46 @@ class _LessonVideoPlayerState extends State<_LessonVideoPlayer> {
             ),
           ),
         ),
+        // Video controls
         Padding(
           padding: const EdgeInsets.only(top: 8),
           child: Row(
             children: [
               Text(
-                _formatDuration(_controller!.value.position),
+                _formatDuration(_controller.value.position),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               Expanded(
                 child: Slider(
-                  value: _controller!.value.position.inMilliseconds
+                  value: _controller.value.position.inMilliseconds
                       .toDouble()
-                      .clamp(0, _controller!.value.duration.inMilliseconds.toDouble()),
+                      .clamp(
+                        0,
+                        _controller.value.duration.inMilliseconds.toDouble(),
+                      ),
                   min: 0,
-                  max: _controller!.value.duration.inMilliseconds.toDouble().clamp(1, double.infinity),
+                  max: _controller.value.duration.inMilliseconds
+                      .toDouble()
+                      .clamp(1, double.infinity),
                   onChanged: (value) {
-                    _controller!.seekTo(Duration(milliseconds: value.toInt()));
+                    _controller.seekTo(Duration(milliseconds: value.toInt()));
                   },
                 ),
               ),
               Text(
-                _formatDuration(_controller!.value.duration),
+                _formatDuration(_controller.value.duration),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               IconButton(
-                icon: Icon(_controller!.value.volume > 0 ? Icons.volume_up : Icons.volume_off),
+                icon: Icon(
+                  _controller.value.volume > 0
+                      ? Icons.volume_up
+                      : Icons.volume_off,
+                ),
                 onPressed: () {
-                  _controller!.setVolume(_controller!.value.volume > 0 ? 0 : 1);
+                  _controller.setVolume(
+                    _controller.value.volume > 0 ? 0 : 1,
+                  );
                 },
               ),
             ],
