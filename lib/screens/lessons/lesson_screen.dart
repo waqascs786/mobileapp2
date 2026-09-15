@@ -375,6 +375,115 @@ class _LessonScreenState extends State<LessonScreen> {
     super.dispose();
   }
 
+  void _showCurriculumSheet(BuildContext context) {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) => Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.outline.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Icon(Icons.menu_book, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Course Content',
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${(_provider.progress * 100).toInt()}% complete',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: ListView.builder(
+                controller: scrollController,
+                itemCount: _provider.sections.fold<int>(0, (sum, s) => sum + s.lessons.length + 1),
+                itemBuilder: (context, index) {
+                  int runningIndex = 0;
+                  for (final section in _provider.sections) {
+                    if (index == runningIndex) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                        child: Text(
+                          section.title,
+                          style: TextStyle(fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
+                        ),
+                      );
+                    }
+                    runningIndex++;
+                    for (final lesson in section.lessons) {
+                      if (index == runningIndex) {
+                        final lessonIndex = _provider._flatLessons.indexOf(lesson);
+                        final isCurrent = lesson.id == _provider.currentLesson?.id;
+                        return ListTile(
+                          dense: true,
+                          leading: Icon(
+                            lesson.isCompleted
+                                ? Icons.check_circle
+                                : isCurrent
+                                    ? Icons.play_circle
+                                    : Icons.play_circle_outline,
+                            size: 22,
+                            color: lesson.isCompleted
+                                ? Colors.green
+                                : isCurrent
+                                    ? theme.colorScheme.primary
+                                    : theme.colorScheme.onSurfaceVariant,
+                          ),
+                          title: Text(
+                            lesson.title,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: isCurrent ? FontWeight.w600 : FontWeight.normal,
+                              color: isCurrent ? theme.colorScheme.primary : null,
+                            ),
+                          ),
+                          onTap: () {
+                            _provider.navigateToLesson(lessonIndex);
+                            Navigator.pop(context);
+                          },
+                          dense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                        );
+                      }
+                      runningIndex++;
+                    }
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -390,8 +499,8 @@ class _LessonScreenState extends State<LessonScreen> {
             overflow: TextOverflow.ellipsis,
           ),
           leading: IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pop(),
           ),
           actions: [
             if (_provider.currentLesson != null &&
@@ -407,9 +516,13 @@ class _LessonScreenState extends State<LessonScreen> {
                 padding: EdgeInsets.symmetric(horizontal: 12),
                 child: Icon(Icons.check_circle, color: Colors.green, size: 24),
               ),
+            IconButton(
+              icon: const Icon(Icons.list),
+              onPressed: () => _showCurriculumSheet(context),
+              tooltip: 'Course content',
+            ),
           ],
         ),
-        drawer: _buildCurriculumDrawer(context, theme),
         body: _provider.isLoading
             ? const Center(child: CircularProgressIndicator())
             : _provider.error != null
@@ -571,7 +684,7 @@ class _LessonScreenState extends State<LessonScreen> {
             ),
 
           // Video player
-          if (lesson.videoUrl != null)
+          if (lesson.videoUrl != null && lesson.videoUrl!.isNotEmpty)
             Padding(
               padding: const EdgeInsets.all(16),
               child: _LessonVideoPlayer(url: lesson.videoUrl!),
