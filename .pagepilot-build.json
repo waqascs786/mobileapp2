@@ -1,12 +1,1 @@
-{
-    "trigger_id": "42acc866-f792-4292-9c78-82f08a9af6ac",
-    "platform": "android",
-    "app_name": "WP Mobile App",
-    "package_name": "com.wpmobileapp.app",
-    "primary_color": "#6C63FF",
-    "api_url": "https://wpmobileapps.us23.cdn-alpha.com",
-    "build_number": "1",
-    "appetize_token": "tok_shrkovyjznwku4dj6o6asqywoq",
-    "appetize_android_key": "",
-    "appetize_ios_key": ""
-}
+{"trigger_id": "cc743807-adca-4fb0-8e98-d48f85ef5fa4", "platform": "android", "app_name": "PagePilot", "package_name": "com.pagepilot.app", "primary_color": "#4F46E5", "api_url": "https://wpmobileapps.us23.cdn-alpha.com/wp-json", "build_number": "3", "appetize_token": "tok_shrkovyjznwku4dj6o6asqywoq"}
