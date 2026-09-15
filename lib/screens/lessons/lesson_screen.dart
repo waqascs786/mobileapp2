@@ -467,7 +467,6 @@ class _LessonScreenState extends State<LessonScreen> {
                             _provider.navigateToLesson(lessonIndex);
                             Navigator.pop(context);
                           },
-                          dense: true,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
                         );
                       }
