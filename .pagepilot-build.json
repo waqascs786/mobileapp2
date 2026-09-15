@@ -1,0 +1,11 @@
+{
+    "platform": "android",
+    "app_name": "WP Mobile App",
+    "package_name": "com.wpmobileapp.app",
+    "primary_color": "#6C63FF",
+    "api_url": "https://wpmobileapps.us23.cdn-alpha.com",
+    "build_number": "1",
+    "appetize_token": "tok_shrkovyjznwku4dj6o6asqywoq",
+    "appetize_android_key": "",
+    "appetize_ios_key": ""
+}

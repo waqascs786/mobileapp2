@@ -1,6 +1,10 @@
 name: Build Mobile App
 
 on:
+  push:
+    paths:
+      - '.pagepilot-build.json'
+
   workflow_dispatch:
     inputs:
       platform:
@@ -48,15 +52,53 @@ env:
 
 jobs:
   # ===========================================================================
+  # Read build config for push-triggered builds
+  # ===========================================================================
+  configure:
+    name: Configure
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' }}
+    outputs:
+      platform: ${{ steps.cfg.outputs.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: cfg
+        run: |
+          if [ -f ".pagepilot-build.json" ]; then
+            PLATFORM=$(python3 -c "import json; print(json.load(open('.pagepilot-build.json')).get('platform','android'))")
+            echo "platform=$PLATFORM" >> "$GITHUB_OUTPUT"
+          else
+            echo "platform=android" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ===========================================================================
   # Android Build — Signed release APK
   # ===========================================================================
   build-android:
     name: Build Android APK
     runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.platform == 'android' || github.event.client_payload.platform == 'android' || (!github.event.inputs.platform && !github.event.client_payload.platform) }}
+    needs: [configure]
+    if: ${{ github.event.inputs.platform == 'android' || github.event.client_payload.platform == 'android' || (needs.configure.result == 'success' && needs.configure.outputs.platform == 'android') || (needs.configure.result == 'skipped' && !github.event.inputs.platform && !github.event.client_payload.platform) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Read build config (push events)
+        if: github.event_name == 'push'
+        run: |
+          if [ -f ".pagepilot-build.json" ]; then
+            python3 -c "
+          import json, os
+          with open('.pagepilot-build.json') as f:
+              cfg = json.load(f)
+          out = os.environ['GITHUB_ENV']
+          with open(out, 'a') as o:
+              for key, default in [('platform','android'),('app_name','PagePilot'),('package_name','com.pagepilot.app'),('primary_color','#4F46E5'),('api_url',''),('build_number','1'),('appetize_token',''),('appetize_android_key',''),('appetize_ios_key','')]:
+                  val = cfg.get(key, default)
+                  if val: o.write(f'{key}={val}\n')
+          "
+            echo "Build config loaded from .pagepilot-build.json"
+          fi
 
       - name: Setup Java 17
         uses: actions/setup-java@v4
@@ -247,10 +289,28 @@ jobs:
   build-ios:
     name: Build iOS Simulator
     runs-on: macos-latest
-    if: ${{ github.event.inputs.platform == 'ios' || github.event.client_payload.platform == 'ios' || (!github.event.inputs.platform && !github.event.client_payload.platform) }}
+    needs: [configure]
+    if: ${{ github.event.inputs.platform == 'ios' || github.event.client_payload.platform == 'ios' || (needs.configure.result == 'success' && needs.configure.outputs.platform == 'ios') }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Read build config (push events)
+        if: github.event_name == 'push'
+        run: |
+          if [ -f ".pagepilot-build.json" ]; then
+            python3 -c "
+          import json, os
+          with open('.pagepilot-build.json') as f:
+              cfg = json.load(f)
+          out = os.environ['GITHUB_ENV']
+          with open(out, 'a') as o:
+              for key, default in [('platform','ios'),('app_name','PagePilot'),('package_name','com.pagepilot.app'),('primary_color','#4F46E5'),('api_url',''),('build_number','1'),('appetize_token',''),('appetize_android_key',''),('appetize_ios_key','')]:
+                  val = cfg.get(key, default)
+                  if val: o.write(f'{key}={val}\n')
+          "
+            echo "Build config loaded from .pagepilot-build.json"
+          fi
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
