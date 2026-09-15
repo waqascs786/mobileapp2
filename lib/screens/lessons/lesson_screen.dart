@@ -9,6 +9,8 @@ import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:io';
 
+import '../../services/api_service.dart';
+
 // ─── Models ──────────────────────────────────────────────────────────────────
 
 class Lesson {
@@ -135,19 +137,45 @@ class LessonProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // TODO: Replace with actual API call
-      // final response = await http.get(Uri.parse('$apiBase/courses/$courseId/sections'));
-      // final data = jsonDecode(response.body) as List;
-      // _sections = data.map((e) => CourseSection.fromJson(e)).toList();
+      final result = await ApiService.instance.get(
+        'courseCurriculum',
+        pathParams: {'id': courseId},
+      );
+      
+      final List<dynamic> sectionsData = result['data'] as List<dynamic>? ?? [];
 
-      // Simulated data
-      _sections = _getDemoSections();
+      _sections = [];
+      for (final secJson in sectionsData) {
+        final sec = secJson as Map<String, dynamic>;
+        final items = (sec['items'] as List<dynamic>? ?? []);
+        final lessons = items.where((item) => item['type'] == 'lesson').map((item) {
+          final id = item['id'].toString();
+          return Lesson(
+            id: id,
+            title: item['title'] as String? ?? '',
+            content: item['content'] as String?,
+            videoUrl: item['videoUrl'] as String?,
+            isCompleted: item['isCompleted'] as bool? ?? false,
+            sortOrder: 0,
+            sectionId: '',
+          );
+        }).toList();
+        if (lessons.isNotEmpty) {
+          _sections.add(CourseSection(
+            id: sec['sectionTitle']?.toString() ?? '',
+            title: sec['sectionTitle'] as String? ?? '',
+            lessons: lessons,
+            sortOrder: 0,
+          ));
+        }
+      }
+
       if (_flatLessons.isNotEmpty) {
         _currentLesson = _flatLessons.first;
         _currentIndex = 0;
       }
     } catch (e) {
-      _error = 'Failed to load course content';
+      _error = 'Failed to load course content: $e';
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -172,8 +200,10 @@ class LessonProvider extends ChangeNotifier {
 
   Future<void> markAsComplete(String lessonId) async {
     try {
-      // TODO: API call to mark lesson as complete
-      // await http.post(Uri.parse('$apiBase/lessons/$lessonId/complete'));
+      await ApiService.instance.post(
+        'lessonComplete',
+        pathParams: {'id': lessonId},
+      );
 
       for (var section in _sections) {
         for (var i = 0; i < section.lessons.length; i++) {
