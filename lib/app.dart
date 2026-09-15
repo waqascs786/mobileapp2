@@ -37,12 +37,45 @@ class PagePilotApp extends StatelessWidget {
             HomeScreen.route: (_) => const HomeScreen(),
             LoginScreen.route: (_) => const LoginScreen(),
             RegisterScreen.route: (_) => const RegisterScreen(),
-            CourseDetailScreen.route: (_) => const CourseDetailScreen(courseId: '0'),
-            LessonScreen.route: (_) => const LessonScreen(courseId: '0', courseTitle: ''),
-            QuizScreen.route: (_) => const QuizScreen(quizId: '0', courseTitle: ''),
             ProfileScreen.route: (_) => const ProfileScreen(),
             WishlistScreen.route: (_) => const WishlistScreen(),
             SettingsScreen.route: (_) => const SettingsScreen(),
+          },
+          onGenerateRoute: (settings) {
+            final args = settings.arguments;
+            switch (settings.name) {
+              case '/course-detail':
+                final courseId = args is String ? args : args?.toString() ?? '0';
+                return MaterialPageRoute(
+                  builder: (_) => CourseDetailScreen(courseId: courseId),
+                );
+              case '/lesson':
+                if (args is Map<String, dynamic>) {
+                  return MaterialPageRoute(
+                    builder: (_) => LessonScreen(
+                      courseId: args['courseId']?.toString() ?? '0',
+                      courseTitle: args['courseTitle']?.toString() ?? '',
+                    ),
+                  );
+                }
+                return MaterialPageRoute(
+                  builder: (_) => const LessonScreen(courseId: '0', courseTitle: ''),
+                );
+              case '/quiz':
+                if (args is Map<String, dynamic>) {
+                  return MaterialPageRoute(
+                    builder: (_) => QuizScreen(
+                      quizId: args['quizId']?.toString() ?? '0',
+                      courseTitle: args['courseTitle']?.toString() ?? '',
+                    ),
+                  );
+                }
+                return MaterialPageRoute(
+                  builder: (_) => const QuizScreen(quizId: '0', courseTitle: ''),
+                );
+              default:
+                return null;
+            }
           },
         );
       },

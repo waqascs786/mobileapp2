@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
@@ -15,9 +14,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   FlutterError.onError = (details) {
-    if (kDebugMode) {
-      FlutterError.presentError(details);
-    }
+    FlutterError.presentError(details);
   };
 
   await SystemChrome.setPreferredOrientations([
@@ -59,8 +56,6 @@ void main() async {
       ),
     );
   }, (error, stack) {
-    if (kDebugMode) {
-      debugPrint('Uncaught error: $error');
-    }
+    debugPrint('Uncaught error: $error');
   });
 }

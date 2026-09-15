@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../config/app_config.dart';
 import '../../models/course.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
-import 'package:share_plus/share_plus.dart';
 
 class CourseDetailScreen extends StatefulWidget {
   static const route = '/course-detail';
@@ -103,7 +103,12 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     if (_course == null) return;
     final config = AppConfig.of(context);
     final url = '${config.wpBaseUrl}/courses/${_course!.id}';
-    await Share.share('Check out this course: ${_course!.title}\n$url');
+    await Clipboard.setData(ClipboardData(text: url));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Course link copied to clipboard')),
+      );
+    }
   }
 
   Future<void> _handleEnrollTap() async {
@@ -262,6 +267,50 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
 
   @override
   Widget build(BuildContext context) {
+    try {
+      return _buildContent(context);
+    } catch (e, stack) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Error')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                Text(
+                  'Something went wrong',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  e.toString(),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 13, color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _isLoading = true;
+                      _error = null;
+                    });
+                    _loadCourseDetail();
+                    _loadReviews();
+                  },
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildContent(BuildContext context) {
     final config = AppConfig.of(context);
 
     if (_isLoading) {
@@ -295,7 +344,14 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
       );
     }
 
-    final course = _course!;
+    final course = _course;
+
+    if (course == null) {
+      return Scaffold(
+        appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0),
+        body: const Center(child: Text('No course data')),
+      );
+    }
 
     return Scaffold(
       body: CustomScrollView(
