@@ -39,7 +39,11 @@ class Lesson {
       id: json['id'] as String,
       title: json['title'] as String,
       content: json['content'] as String?,
-      videoUrl: json['videoUrl'] as String?,
+      videoUrl: (json['videoUrl'] as String?)?.isNotEmpty == true
+          ? json['videoUrl'] as String
+          : (json['video_embed'] as String?)?.isNotEmpty == true
+              ? json['video_embed'] as String
+              : null,
       attachments: (json['attachments'] as List<dynamic>?)
               ?.map((e) => LessonAttachment.fromJson(e as Map<String, dynamic>))
               .toList() ??
