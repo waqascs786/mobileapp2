@@ -92,10 +92,22 @@ jobs:
           with open('.pagepilot-build.json') as f:
               cfg = json.load(f)
           out = os.environ['GITHUB_ENV']
+          mapping = {
+              'platform': 'PLATFORM',
+              'app_name': 'APP_NAME',
+              'package_name': 'PACKAGE_NAME',
+              'primary_color': 'PRIMARY_COLOR',
+              'api_url': 'API_URL',
+              'build_number': 'BUILD_NUMBER',
+              'appetize_token': 'APPETIZE_TOKEN',
+              'appetize_android_key': 'APPETIZE_ANDROID_KEY',
+              'appetize_ios_key': 'APPETIZE_IOS_KEY',
+          }
           with open(out, 'a') as o:
-              for key, default in [('platform','android'),('app_name','PagePilot'),('package_name','com.pagepilot.app'),('primary_color','#4F46E5'),('api_url',''),('build_number','1'),('appetize_token',''),('appetize_android_key',''),('appetize_ios_key','')]:
-                  val = cfg.get(key, default)
-                  if val: o.write(f'{key}={val}\n')
+              for key, env_key in mapping.items():
+                  val = cfg.get(key, '')
+                  if val:
+                      o.write(f'{env_key}={val}\n')
           "
             echo "Build config loaded from .pagepilot-build.json"
           fi
@@ -252,6 +264,7 @@ jobs:
             exit 1
           fi
           echo "Uploading Android APK to Appetize.io..."
+          echo "Token: ${APPETIZE_TOKEN:0:10}..."
           if [ -n "$APPETIZE_ANDROID_KEY" ]; then
             echo "Updating existing app: $APPETIZE_ANDROID_KEY"
             RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
@@ -304,10 +317,22 @@ jobs:
           with open('.pagepilot-build.json') as f:
               cfg = json.load(f)
           out = os.environ['GITHUB_ENV']
+          mapping = {
+              'platform': 'PLATFORM',
+              'app_name': 'APP_NAME',
+              'package_name': 'PACKAGE_NAME',
+              'primary_color': 'PRIMARY_COLOR',
+              'api_url': 'API_URL',
+              'build_number': 'BUILD_NUMBER',
+              'appetize_token': 'APPETIZE_TOKEN',
+              'appetize_android_key': 'APPETIZE_ANDROID_KEY',
+              'appetize_ios_key': 'APPETIZE_IOS_KEY',
+          }
           with open(out, 'a') as o:
-              for key, default in [('platform','ios'),('app_name','PagePilot'),('package_name','com.pagepilot.app'),('primary_color','#4F46E5'),('api_url',''),('build_number','1'),('appetize_token',''),('appetize_android_key',''),('appetize_ios_key','')]:
-                  val = cfg.get(key, default)
-                  if val: o.write(f'{key}={val}\n')
+              for key, env_key in mapping.items():
+                  val = cfg.get(key, '')
+                  if val:
+                      o.write(f'{env_key}={val}\n')
           "
             echo "Build config loaded from .pagepilot-build.json"
           fi
