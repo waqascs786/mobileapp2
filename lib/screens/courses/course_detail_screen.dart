@@ -123,8 +123,13 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     if (_course == null) return;
 
     if (_course!.isEnrolled) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Opening course content...')),
+      Navigator.pushNamed(
+        context,
+        '/lesson',
+        arguments: {
+          'courseId': _course!.id.toString(),
+          'courseTitle': _course!.title,
+        },
       );
     } else {
       _showEnrollConfirmation();
@@ -591,7 +596,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
         return _CurriculumSectionWidget(
           section: section,
           primaryColor: config.primaryColor,
-          isExpanded: course.curriculum.length == 1,
+          isExpanded: true,
+          courseId: course.id,
         );
       },
     );
@@ -964,11 +970,13 @@ class _CurriculumSectionWidget extends StatefulWidget {
   final CurriculumSection section;
   final Color primaryColor;
   final bool isExpanded;
+  final int courseId;
 
   const _CurriculumSectionWidget({
     required this.section,
     required this.primaryColor,
     this.isExpanded = false,
+    required this.courseId,
   });
 
   @override
@@ -981,7 +989,7 @@ class _CurriculumSectionWidgetState extends State<_CurriculumSectionWidget> {
   @override
   void initState() {
     super.initState();
-    _expanded = widget.isExpanded;
+    _expanded = true;
   }
 
   @override
@@ -1069,6 +1077,28 @@ class _CurriculumSectionWidgetState extends State<_CurriculumSectionWidget> {
                       color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
                     ),
                   ),
+                  onTap: () {
+                    if (lesson.type == CurriculumItemType.quiz) {
+                      Navigator.pushNamed(
+                        context,
+                        '/quiz',
+                        arguments: {
+                          'quizId': lesson.id.toString(),
+                          'courseTitle': '',
+                        },
+                      );
+                    } else {
+                      Navigator.pushNamed(
+                        context,
+                        '/lesson',
+                        arguments: {
+                          'courseId': widget.courseId.toString(),
+                          'courseTitle': '',
+                          'lessonId': lesson.id.toString(),
+                        },
+                      );
+                    }
+                  },
                 );
               }).toList(),
             ),
