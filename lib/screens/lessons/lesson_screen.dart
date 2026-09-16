@@ -6,10 +6,8 @@ import 'package:flutter_html/flutter_html.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
-import 'package:video_player/video_player.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import 'dart:io';
-
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/api_service.dart';
 
@@ -841,93 +839,58 @@ class _LessonVideoPlayer extends StatefulWidget {
 }
 
 class _LessonVideoPlayerState extends State<_LessonVideoPlayer> {
-  String? _youtubeId;
-  VideoPlayerController? _controller;
-  bool _isInitialized = false;
+  late final WebViewController _webController;
+  String? _embedUrl;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _youtubeId = _extractYouTubeId(widget.url);
-    if (_youtubeId == null) {
-      _initDirectPlayer();
+    _embedUrl = _buildEmbedUrl(widget.url);
+
+    if (_embedUrl == null) {
+      _error = 'Unsupported video format';
+      return;
     }
+
+    _webController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.black)
+      ..loadRequest(Uri.parse(_embedUrl!));
   }
 
-  String? _extractYouTubeId(String url) {
-    final patterns = [
-      RegExp(r'(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([A-Za-z0-9_-]{11})'),
-    ];
-    for (final p in patterns) {
-      final m = p.firstMatch(url);
-      if (m != null) return m.group(1);
+  String? _buildEmbedUrl(String url) {
+    // YouTube
+    final ytMatch = RegExp(r'(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([A-Za-z0-9_-]{11})').firstMatch(url);
+    if (ytMatch != null) {
+      final id = ytMatch.group(1);
+      return 'https://www.youtube.com/embed/$id?playsinline=1&rel=0&modestbranding=1';
     }
+
+    // Vimeo
+    final vimeoMatch = RegExp(r'(?:vimeo\.com/)(\d+)').firstMatch(url);
+    if (vimeoMatch != null) {
+      final id = vimeoMatch.group(1);
+      return 'https://player.vimeo.com/video/$id?playsinline=1';
+    }
+
+    // Wistia
+    final wistiaMatch = RegExp(r'wistia\.(?:com|net)/(?:medias|embed/medias)/([A-Za-z0-9]+)').firstMatch(url);
+    if (wistiaMatch != null) {
+      final id = wistiaMatch.group(1);
+      return 'https://fast.wistia.net/embed/medias/$id';
+    }
+
+    // Direct video URL (mp4, etc) — return as-is for WebView
+    if (RegExp(r'\.(mp4|webm|ogg)(\?|$)', caseSensitive: false).hasMatch(url)) {
+      return url;
+    }
+
     return null;
-  }
-
-  Future<void> _initDirectPlayer() async {
-    try {
-      _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
-      await _controller!.initialize();
-      _controller!.addListener(() {
-        if (mounted) setState(() {});
-      });
-      setState(() => _isInitialized = true);
-    } catch (e) {
-      setState(() => _error = 'Failed to load video');
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // YouTube: show thumbnail with play button
-    if (_youtubeId != null) {
-      return GestureDetector(
-        onTap: () async {
-          final url = Uri.parse('https://www.youtube.com/watch?v=$_youtubeId');
-          if (await canLaunchUrl(url)) {
-            await launchUrl(url, mode: LaunchMode.externalApplication);
-          }
-        },
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: AspectRatio(
-            aspectRatio: 16 / 9,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Image.network(
-                  'https://img.youtube.com/vi/$_youtubeId/0.jpg',
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: Colors.black87,
-                    child: const Icon(Icons.play_circle_outline, color: Colors.white54, size: 64),
-                  ),
-                ),
-                Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.black38,
-                    shape: BoxShape.circle,
-                  ),
-                  padding: const EdgeInsets.all(12),
-                  child: const Icon(Icons.play_arrow, color: Colors.white, size: 48),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    // Direct video URL
     if (_error != null) {
       return Container(
         height: 200,
@@ -948,93 +911,13 @@ class _LessonVideoPlayerState extends State<_LessonVideoPlayer> {
       );
     }
 
-    if (!_isInitialized || _controller == null) {
-      return Container(
-        height: 200,
-        decoration: BoxDecoration(
-          color: Colors.black87,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Center(
-          child: CircularProgressIndicator(color: Colors.white),
-        ),
-      );
-    }
-
-    final aspectRatio = _controller!.value.aspectRatio;
-    return Column(
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: AspectRatio(
-            aspectRatio: aspectRatio,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                VideoPlayer(_controller!),
-                GestureDetector(
-                  onTap: () {
-                    _controller!.value.isPlaying
-                        ? _controller!.pause()
-                        : _controller!.play();
-                  },
-                  child: AnimatedOpacity(
-                    opacity: _controller!.value.isPlaying ? 0.0 : 1.0,
-                    duration: const Duration(milliseconds: 300),
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        color: Colors.black38,
-                        shape: BoxShape.circle,
-                      ),
-                      padding: const EdgeInsets.all(12),
-                      child: const Icon(Icons.play_arrow, color: Colors.white, size: 48),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Row(
-            children: [
-              Text(
-                _formatDuration(_controller!.value.position),
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              Expanded(
-                child: Slider(
-                  value: _controller!.value.position.inMilliseconds
-                      .toDouble()
-                      .clamp(0, _controller!.value.duration.inMilliseconds.toDouble()),
-                  min: 0,
-                  max: _controller!.value.duration.inMilliseconds.toDouble().clamp(1, double.infinity),
-                  onChanged: (value) {
-                    _controller!.seekTo(Duration(milliseconds: value.toInt()));
-                  },
-                ),
-              ),
-              Text(
-                _formatDuration(_controller!.value.duration),
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              IconButton(
-                icon: Icon(_controller!.value.volume > 0 ? Icons.volume_up : Icons.volume_off),
-                onPressed: () {
-                  _controller!.setVolume(_controller!.value.volume > 0 ? 0 : 1);
-                },
-              ),
-            ],
-          ),
-        ),
-      ],
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: WebViewWidget(controller: _webController),
+      ),
     );
-  }
-
-  String _formatDuration(Duration d) {
-    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '${d.inMinutes > 0 ? '${d.inMinutes}:' : ''}$seconds';
   }
 }
 
