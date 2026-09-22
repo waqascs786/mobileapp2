@@ -1,6 +1,6 @@
 {
-    "trigger_id": "10f6f5de-c177-4bb2-b299-b44debf2f2f3",
-    "platform": "android",
+    "trigger_id": "42227540-6ca6-4c05-b5db-3bddcfce9b96",
+    "platform": "ios",
     "app_name": "WP Mobile App 3",
     "package_name": "com.app3.lifterapp",
     "primary_color": "#0073aa",
@@ -11,6 +11,6 @@
     "asc_key_id": "27R5DCZJ59",
     "asc_issuer_id": "d030b39b-d9b7-4128-88b5-ab386e267e7e",
     "appetize_token": "tok_ibz2kvzvpn75lbpmi2hcvlasae",
-    "appetize_android_key": "x6xbpnsgl66lv5xjiglrd3kshi",
+    "appetize_android_key": "",
     "appetize_ios_key": ""
 }
