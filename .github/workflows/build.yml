@@ -1239,20 +1239,53 @@ jobs:
                   except Exception:
                       return e.code, {'raw': raw}
 
-          apps = api('GET', f'/apps?filter[bundleId]={BUNDLE}&limit=10')
-          print('GET /apps status:', apps[0])
+          def list_apps(limit=100, link=None):
+              path = link if link else f'/apps?limit={limit}'
+              st, body = api('GET', path)
+              return st, body
+
+          # Diagnostics: list every app this key can see (proper encoding)
+          import urllib.parse
+          qs = urllib.parse.urlencode({'filter[bundleId]': BUNDLE, 'limit': 50})
+          st, body = api('GET', f'/apps?{qs}')
+          print(f'GET /apps?filter[bundleId]={BUNDLE} status:', st)
           found = None
-          for a in (apps[1].get('data') or []):
-              if (a.get('attributes') or {}).get('bundleId') == BUNDLE:
+          for a in (body.get('data') or []):
+              attrs = a.get('attributes') or {}
+              if attrs.get('bundleId') == BUNDLE:
                   found = a
                   break
+
+          if not found:
+              # Fallback: unfiltered list (shows what the key can access)
+              st2, body2 = list_apps()
+              print('GET /apps (unfiltered) status:', st2)
+              all_apps = body2.get('data') or []
+              print(f'Apps visible to this key: {len(all_apps)}')
+              for a in all_apps[:50]:
+                  attrs = a.get('attributes') or {}
+                  print(f"  - {attrs.get('bundleId')} | {attrs.get('name')} | id={a.get('id')}")
+              # Also check whether the bundle ID is registered at all
+              qs2 = urllib.parse.urlencode({'filter[identifier]': BUNDLE, 'limit': 10})
+              st3, body3 = api('GET', f'/bundleIds?{qs2}')
+              print(f'GET /bundleIds?filter[identifier]={BUNDLE} status:', st3)
+              for b in (body3.get('data') or []):
+                  battrs = b.get('attributes') or {}
+                  print(f"  - registered: {battrs.get('identifier')} id={b.get('id')} platform={battrs.get('platform')}")
+              for a in all_apps:
+                  attrs = a.get('attributes') or {}
+                  if attrs.get('bundleId') == BUNDLE:
+                      found = a
+                      break
+
           if found:
-              print('App exists:', found['id'], (found.get('attributes') or {}).get('name'))
+              print('App exists:', found['id'], (found.get('attributes') or {}).get('name'),
+                    (found.get('attributes') or {}).get('bundleId'))
               raise SystemExit(0)
 
           print(f'App record not found for {BUNDLE}; attempting create...')
           safe_name = re.sub(r'[^A-Za-z0-9 .-]', '', APP_NAME).strip() or 'PagePilot App'
-          status, body = api('POST', '/apps', {
+          status, resp = api('POST', '/apps', {
               'data': {
                   'type': 'apps',
                   'attributes': {
@@ -1264,13 +1297,19 @@ jobs:
               }
           })
           print('POST /apps status:', status)
-          print(json.dumps(body, indent=2)[:2000])
+          print(json.dumps(resp, indent=2)[:2000])
           if status in (200, 201):
               print('Created app record')
               raise SystemExit(0)
 
-          # If forbidden, still exit 0 only when app might be visible under another lookup — otherwise fail clearly.
-          print('::error::App Store Connect app record missing and could not be created. Create the app once in App Store Connect (bundle ID ' + BUNDLE + ') or use an ASC API key with App Manager role, then re-run.')
+          detail = ''
+          errs = resp.get('errors') or []
+          if errs:
+              detail = errs[0].get('detail') or errs[0].get('title') or ''
+          if status == 403:
+              print('::error::ASC key cannot CREATE apps (' + detail + '). Create the app once in App Store Connect for bundle ID ' + BUNDLE + ', or upload an ASC API key with App Manager role that can create apps, then re-run.')
+          else:
+              print('::error::App Store Connect app record missing and could not be created (HTTP ' + str(status) + '). Create the app once in App Store Connect (bundle ID ' + BUNDLE + ') or use an ASC API key with App Manager role, then re-run.')
           raise SystemExit(1)
           PY
 
