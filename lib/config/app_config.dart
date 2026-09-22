@@ -60,14 +60,14 @@ class AppConfig {
 
   static Future<void> load() async {
     _instance = AppConfig._(
-      appName: 'WP Mobile App',
-      packageName: 'com.wpmobileapp.app',
-      primaryColor: Color(0xFF6C63FF),
-      secondaryColor: Color(0xFFFF6584),
-      accentColor: Color(0xFF00C9A7),
+      appName: 'WP Mobile App 8',
+      packageName: 'com.app2.lifterapp',
+      primaryColor: Color(0xFF0073AA),
+      secondaryColor: Color(0xFF005177),
+      accentColor: Color(0xFF00AADC),
       bgColor: Color(0xFFFFFFFF),
       textColor: Color(0xFF333333),
-      primaryColorDark: Color(0xFF6C63FF).withOpacity(0.8),
+      primaryColorDark: Color(0xFF0073AA).withOpacity(0.8),
       siteUrl: 'https://wpmobileapps.us23.cdn-alpha.com',
       apiBaseUrl: 'https://wpmobileapps.us23.cdn-alpha.com/wp-json',
       wpBaseUrl: 'https://wpmobileapps.us23.cdn-alpha.com',
