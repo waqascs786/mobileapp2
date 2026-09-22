@@ -1222,7 +1222,7 @@ jobs:
               token = token.decode()
 
           def api(method, path, body=None):
-              url = f'https://api.appstoreconnect.apple.com{path}'
+              url = f'https://api.appstoreconnect.apple.com/v1{path}'
               data = json.dumps(body).encode() if body is not None else None
               req = urllib.request.Request(url, data=data, method=method, headers={
                   'Authorization': f'Bearer {token}',
