@@ -919,22 +919,30 @@ jobs:
                   text,
               )
               team = os.environ.get('IOS_TEAM_ID', '').strip()
-              def set_build_setting(text, key, value):
-                  if re.search(rf'\b{re.escape(key)} = [^;]+;', text):
-                      return re.sub(rf'\b{re.escape(key)} = [^;]+;', f'{key} = {value};', text)
-                  # Insert after PRODUCT_BUNDLE_IDENTIFIER lines in build settings
-                  return re.sub(
+              # Force manual distribution signing on every configuration block.
+              text = re.sub(r'CODE_SIGN_STYLE = [^;]+;', 'CODE_SIGN_STYLE = Manual;', text)
+              text = re.sub(r'CODE_SIGN_IDENTITY = [^;]+;', 'CODE_SIGN_IDENTITY = "Apple Distribution";', text)
+              text = re.sub(r'CODE_SIGNING_REQUIRED = [^;]+;', 'CODE_SIGNING_REQUIRED = YES;', text)
+              text = re.sub(r'CODE_SIGNING_ALLOWED = [^;]+;', 'CODE_SIGNING_ALLOWED = YES;', text)
+              text = re.sub(r'PROVISIONING_PROFILE_SPECIFIER = [^;]*;', 'PROVISIONING_PROFILE_SPECIFIER = "";', text)
+              if team:
+                  if re.search(r'DEVELOPMENT_TEAM = [^;]+;', text):
+                      text = re.sub(r'DEVELOPMENT_TEAM = [^;]+;', f'DEVELOPMENT_TEAM = {team};', text)
+                  else:
+                      text = re.sub(
+                          r'(PRODUCT_BUNDLE_IDENTIFIER = [^;]+;)',
+                          rf'\1\n\t\t\t\tDEVELOPMENT_TEAM = {team};',
+                          text,
+                      )
+              # Ensure CODE_SIGN_STYLE exists even if pbx had none
+              if 'CODE_SIGN_STYLE' not in text:
+                  text = re.sub(
                       r'(PRODUCT_BUNDLE_IDENTIFIER = [^;]+;)',
-                      rf'\1\n\t\t\t\t{key} = {value};',
+                      r'\1\n\t\t\t\tCODE_SIGN_STYLE = Manual;',
                       text,
                   )
-              if team:
-                  text = set_build_setting(text, 'DEVELOPMENT_TEAM', team)
-              text = set_build_setting(text, 'CODE_SIGN_STYLE', 'Manual')
-              text = set_build_setting(text, 'CODE_SIGN_IDENTITY', '"Apple Distribution"')
-              text = set_build_setting(text, 'PROVISIONING_PROFILE_SPECIFIER', '""')
-              text = set_build_setting(text, 'CODE_SIGNING_REQUIRED', 'YES')
               pbx.write_text(text)
+              print('Signing settings applied to project.pbxproj')
           print(f'App: {app_name} | Bundle: {bundle} | Build: {build_number} | Team: {os.environ.get("IOS_TEAM_ID","")}')
           PY
 
