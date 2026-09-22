@@ -1176,6 +1176,11 @@ jobs:
           ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
         run: |
           set -e
+          VENV="$RUNNER_TEMP/pp_asc_venv"
+          python3 -m venv "$VENV"
+          # shellcheck disable=SC1091
+          . "$VENV/bin/activate"
+          pip install --quiet 'PyJWT[crypto]'
           python3 <<'PY'
           import base64, json, os, pathlib, re, time, urllib.error, urllib.request
 
@@ -1201,12 +1206,7 @@ jobs:
               raise SystemExit(1)
 
           # Build ES256 JWT (no scope — Apple rejects illegal scopes on some ops)
-          try:
-              import jwt as pyjwt
-          except ImportError:
-              import subprocess
-              subprocess.run(['pip3', 'install', '--quiet', 'PyJWT', 'cryptography'], check=False)
-              import jwt as pyjwt
+          import jwt as pyjwt
           token = pyjwt.encode(
               {
                   'iss': ISSUER,
