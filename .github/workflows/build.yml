@@ -820,12 +820,28 @@ jobs:
                   # App may already exist / race — continue; profile creation will surface real errors
                   print(f"Warn: could not create app record (may already exist): {e}")
 
-          # --- Create App Store provisioning profile linked to this cert ---
+          # --- Ensure App Store provisioning profile linked to this cert ---
+          profile_name = f"PagePilot {BUNDLE} AppStore"
+          # Remove duplicate/stale profiles with the same name (or same bundle) so create succeeds.
+          try:
+              existing_profiles = api("GET", "/profiles?limit=200")
+              for p in existing_profiles.get("data", []):
+                  attrs = p.get("attributes", {})
+                  rel_bundle = (p.get("relationships", {}).get("bundleId", {}) or {}).get("data", {}) or {}
+                  if attrs.get("name") == profile_name or rel_bundle.get("id") == bundle_res_id:
+                      try:
+                          api("DELETE", f"/profiles/{p['id']}")
+                          print(f"Deleted existing profile {p['id']} ({attrs.get('name')})")
+                      except Exception as pe:
+                          print(f"Warn: could not delete profile {p.get('id')}: {pe}")
+          except Exception as le:
+              print(f"Warn: could not list profiles: {le}")
+
           profile_resp = api("POST", "/profiles", {
               "data": {
                   "type": "profiles",
                   "attributes": {
-                      "name": f"PagePilot {BUNDLE} AppStore",
+                      "name": profile_name,
                       "profileType": "IOS_APP_STORE",
                   },
                   "relationships": {
