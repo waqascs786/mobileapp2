@@ -624,7 +624,7 @@ jobs:
           . "$VENV/bin/activate"
           pip install --quiet 'PyJWT[crypto]'
           python3 - <<'PY'
-          import base64, json, os, subprocess, sys, time, uuid
+          import base64, json, os, re, subprocess, sys, time, uuid
           from pathlib import Path
           import jwt as pyjwt
 
@@ -748,19 +748,32 @@ jobs:
                   bundle_res_id = b["id"]
                   break
           if not bundle_res_id:
-              bid_create = api("POST", "/bundleIds", {
-                  "data": {
-                      "type": "bundleIds",
-                      "attributes": {
-                          "identifier": BUNDLE,
-                          "name": f"{APP_NAME} ({BUNDLE})",
-                          "platform": "IOS",
-                          "seedId": TEAM,
-                      },
-                  }
-              })
-              bundle_res_id = bid_create["data"]["id"]
-              print(f"Registered App ID {BUNDLE} -> {bundle_res_id}")
+              safe_name = re.sub(r'[^A-Za-z0-9 .-]', '', f"{APP_NAME}").strip() or "PagePilot App"
+              if len(safe_name) > 50:
+                  safe_name = safe_name[:50].strip()
+              try:
+                  bid_create = api("POST", "/bundleIds", {
+                      "data": {
+                          "type": "bundleIds",
+                          "attributes": {
+                              "identifier": BUNDLE,
+                              "name": safe_name,
+                              "platform": "IOS",
+                              "seedId": TEAM,
+                          },
+                      }
+                  })
+                  bundle_res_id = bid_create["data"]["id"]
+                  print(f"Registered App ID {BUNDLE} -> {bundle_res_id}")
+              except Exception as e:
+                  bid_list = api("GET", f"/bundleIds?filter[identifier]={BUNDLE}&limit=100")
+                  for b in bid_list.get("data", []):
+                      if b.get("attributes", {}).get("identifier") == BUNDLE:
+                          bundle_res_id = b["id"]
+                          break
+                  if not bundle_res_id:
+                      raise
+                  print(f"App ID already existed -> {bundle_res_id} ({e})")
 
           # --- Ensure App Store Connect app record exists (required for App Store profiles) ---
           apps = api("GET", f"/apps?filter[bundleId]={BUNDLE}&limit=10")
@@ -771,15 +784,15 @@ jobs:
                   break
           if not app_res_id:
               try:
-                  app_create = api("POST", "/apps", {
-                      "data": {
-                          "type": "apps",
-                          "attributes": {
-                              "name": APP_NAME,
-                              "primaryLanguage": "en",
-                              "sku": f"PP{abs(hash(BUNDLE)) % 10**10}",
-                              "bundleId": BUNDLE,
-                          },
+                app_create = api("POST", "/apps", {
+                    "data": {
+                        "type": "apps",
+                        "attributes": {
+                            "name": re.sub(r'[^A-Za-z0-9 .-]', '', APP_NAME).strip() or "PagePilot App",
+                            "primaryLanguage": "en",
+                            "sku": f"PP{KEY_ID}{abs(hash(BUNDLE)) % 10**6}",
+                            "bundleId": BUNDLE,
+                        },
                           "relationships": {
                               "bundleId": {"data": {"type": "bundleIds", "id": bundle_res_id}},
                           },
