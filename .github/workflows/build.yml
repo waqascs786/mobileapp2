@@ -1031,7 +1031,7 @@ jobs:
           <plist version="1.0">
           <dict>
             <key>method</key>
-            <string>app-store</string>
+            <string>app-store-connect</string>
             <key>teamID</key>
             <string>${IOS_TEAM_ID}</string>
             <key>signingStyle</key>
@@ -1170,6 +1170,109 @@ jobs:
           name: ios-ipa-${{ env.BUILD_NUMBER }}
           path: build/ios/ipa/*.ipa
           retention-days: 30
+
+      - name: Ensure App Store Connect app record
+        env:
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          set -e
+          python3 <<'PY'
+          import base64, json, os, pathlib, re, time, urllib.error, urllib.request
+
+          KEY_ID = os.environ.get('ASC_KEY_ID', '').strip()
+          ISSUER = os.environ.get('ASC_ISSUER_ID', '').strip()
+          BUNDLE = os.environ.get('PACKAGE_NAME', '').strip()
+          APP_NAME = os.environ.get('APP_NAME', 'PagePilot App').strip()
+          KEY_PATH = pathlib.Path.home() / '.appstoreconnect/private_keys' / f'AuthKey_{KEY_ID}.p8'
+
+          raw = os.environ.get('ASC_PRIVATE_KEY', '').strip().strip('"').strip("'")
+          if raw and '-----BEGIN' not in raw:
+              try:
+                  dec = base64.b64decode(raw, validate=False).decode('utf-8')
+                  if '-----BEGIN' in dec:
+                      raw = dec
+              except Exception:
+                  pass
+          if raw and '\\n' in raw and '\n' not in raw:
+              raw = raw.replace('\\n', '\n')
+          pem = raw if '-----BEGIN' in raw else KEY_PATH.read_text().strip() if KEY_PATH.exists() else ''
+          if '-----BEGIN' not in pem:
+              print('::error::ASC_PRIVATE_KEY is not a valid PEM private key')
+              raise SystemExit(1)
+
+          # Build ES256 JWT (no scope — Apple rejects illegal scopes on some ops)
+          try:
+              import jwt as pyjwt
+          except ImportError:
+              import subprocess
+              subprocess.run(['pip3', 'install', '--quiet', 'PyJWT', 'cryptography'], check=False)
+              import jwt as pyjwt
+          token = pyjwt.encode(
+              {
+                  'iss': ISSUER,
+                  'iat': int(time.time()),
+                  'exp': int(time.time()) + 1200,
+                  'aud': 'appstoreconnect-v1',
+              },
+              pem,
+              algorithm='ES256',
+              headers={'kid': KEY_ID, 'typ': 'JWT', 'alg': 'ES256'},
+          )
+          if isinstance(token, bytes):
+              token = token.decode()
+
+          def api(method, path, body=None):
+              url = f'https://api.appstoreconnect.apple.com{path}'
+              data = json.dumps(body).encode() if body is not None else None
+              req = urllib.request.Request(url, data=data, method=method, headers={
+                  'Authorization': f'Bearer {token}',
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json',
+              })
+              try:
+                  with urllib.request.urlopen(req, timeout=60) as r:
+                      return r.status, json.loads(r.read().decode() or '{}')
+              except urllib.error.HTTPError as e:
+                  raw = e.read().decode(errors='replace')
+                  try:
+                      return e.code, json.loads(raw)
+                  except Exception:
+                      return e.code, {'raw': raw}
+
+          apps = api('GET', f'/apps?filter[bundleId]={BUNDLE}&limit=10')
+          print('GET /apps status:', apps[0])
+          found = None
+          for a in (apps[1].get('data') or []):
+              if (a.get('attributes') or {}).get('bundleId') == BUNDLE:
+                  found = a
+                  break
+          if found:
+              print('App exists:', found['id'], (found.get('attributes') or {}).get('name'))
+              raise SystemExit(0)
+
+          print(f'App record not found for {BUNDLE}; attempting create...')
+          safe_name = re.sub(r'[^A-Za-z0-9 .-]', '', APP_NAME).strip() or 'PagePilot App'
+          status, body = api('POST', '/apps', {
+              'data': {
+                  'type': 'apps',
+                  'attributes': {
+                      'name': safe_name,
+                      'primaryLanguage': 'en',
+                      'sku': f'PP{KEY_ID}{abs(hash(BUNDLE)) % 10**8}',
+                      'bundleId': BUNDLE,
+                  },
+              }
+          })
+          print('POST /apps status:', status)
+          print(json.dumps(body, indent=2)[:2000])
+          if status in (200, 201):
+              print('Created app record')
+              raise SystemExit(0)
+
+          # If forbidden, still exit 0 only when app might be visible under another lookup — otherwise fail clearly.
+          print('::error::App Store Connect app record missing and could not be created. Create the app once in App Store Connect (bundle ID ' + BUNDLE + ') or use an ASC API key with App Manager role, then re-run.')
+          raise SystemExit(1)
+          PY
 
       - name: Upload to App Store Connect (TestFlight)
         env:
