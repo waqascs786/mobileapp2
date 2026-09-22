@@ -1094,13 +1094,13 @@ jobs:
         env:
           PROFILE_NAME: ${{ steps.auto_sign.outputs.profile_name }}
         run: |
-          set -e
+          set -eo pipefail
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security list-keychains -d user -s "$KEYCHAIN_PATH" "$HOME/Library/Keychains/login.keychain-db"
           echo "Available signing identities:"
           security find-identity -v -p codesigning || true
 
-          # Build Flutter iOS app without signing, then archive/export with explicit manual settings.
+          # Build Flutter iOS app without signing, then archive/export with explicit manual settings on Runner only.
           flutter build ios --release --no-codesign
 
           python3 <<'PY'
@@ -1108,9 +1108,9 @@ jobs:
           pbx = pathlib.Path('ios/Runner.xcodeproj/project.pbxproj')
           text = pbx.read_text()
           team = os.environ.get('IOS_TEAM_ID', '').strip()
-          profile_name = os.environ.get('PROFILE_NAME', '').strip() or os.environ.get('PROFILE_UUID', '').strip()
+          profile_name = os.environ.get('PROFILE_NAME', '').strip()
           profile_uuid = os.environ.get('PROFILE_UUID', '').strip()
-          bundle = os.environ.get('PACKAGE_NAME', '').strip()
+          # Force manual distribution signing only in Runner pbxproj (Pods must stay without profile overrides).
           text = re.sub(r'CODE_SIGN_STYLE = [^;]+;', 'CODE_SIGN_STYLE = Manual;', text)
           text = re.sub(r'CODE_SIGN_IDENTITY = [^;]+;', 'CODE_SIGN_IDENTITY = "Apple Distribution";', text)
           text = re.sub(r'CODE_SIGNING_REQUIRED = [^;]+;', 'CODE_SIGNING_REQUIRED = YES;', text)
@@ -1131,9 +1131,11 @@ jobs:
               else:
                   text = re.sub(r'(PRODUCT_BUNDLE_IDENTIFIER = [^;]+;)', rf'\1\n\t\t\t\tDEVELOPMENT_TEAM = {team};', text)
           pbx.write_text(text)
-          print(f'Patched signing: team={team} profile_name={profile_name} uuid={profile_uuid} bundle={bundle}')
+          print(f'Patched Runner signing: team={team} profile_name={profile_name} uuid={profile_uuid}')
           PY
 
+          # Only override settings that are safe project-wide; profile identity lives in Runner pbxproj.
+          # CODE_SIGNING_ALLOWED=NO for Pods is handled by not passing PROVISIONING_PROFILE* here.
           xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
@@ -1141,20 +1143,24 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM="$IOS_TEAM_ID" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
-            PROVISIONING_PROFILE="$PROFILE_UUID" \
             CODE_SIGNING_REQUIRED=YES \
             CODE_SIGNING_ALLOWED=YES \
             OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN_PATH" \
-            | tee "$RUNNER_TEMP/xcodebuild_archive.log" || {
-              echo "::error::xcodebuild archive failed"
-              exit 1
-            }
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            PROVISIONING_PROFILE="$PROFILE_UUID" \
+            -skipPackagePluginValidation \
+            2>&1 | tee "$RUNNER_TEMP/xcodebuild_archive.log"
+
+          if [ ! -d "$RUNNER_TEMP/Runner.xcarchive" ]; then
+            echo "::error::Archive was not created"
+            exit 1
+          fi
 
           xcodebuild -exportArchive \
             -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
             -exportPath "$RUNNER_TEMP/ipa" \
-            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            2>&1 | tee "$RUNNER_TEMP/xcodebuild_export.log"
 
           mkdir -p build/ios/ipa
           cp "$RUNNER_TEMP/ipa"/*.ipa build/ios/ipa/
