@@ -613,8 +613,11 @@ jobs:
             exit 1
           fi
           echo "Auto-generating distribution certificate and provisioning profile..."
-          pip3 install --quiet --user 'PyJWT[crypto]' || pip3 install --quiet --user PyJWT cryptography
-          export PATH="$HOME/.local/bin:$PATH"
+          VENV="$RUNNER_TEMP/pp_venv"
+          python3 -m venv "$VENV"
+          # shellcheck disable=SC1091
+          . "$VENV/bin/activate"
+          pip install --quiet 'PyJWT[crypto]'
           python3 - <<'PY'
           import base64, json, os, subprocess, sys, time, uuid
           from pathlib import Path
