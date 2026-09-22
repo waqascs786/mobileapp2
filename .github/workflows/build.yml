@@ -636,7 +636,7 @@ jobs:
           API = "https://api.appstoreconnect.apple.com/v1"
 
           def sh(*args, **kwargs):
-              return subprocess.run(args, check=True, capture_output, text=True, **kwargs).stdout
+              return subprocess.run(args, check=True, capture_output=True, text=True, **kwargs).stdout
 
           # --- JWT ---
           now = int(time.time())
