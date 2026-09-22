@@ -456,6 +456,11 @@ jobs:
                   f'PRODUCT_BUNDLE_IDENTIFIER = {bundle};',
                   text,
               )
+              text = re.sub(
+                  r'IPHONEOS_DEPLOYMENT_TARGET = [^;]+;',
+                  'IPHONEOS_DEPLOYMENT_TARGET = 15.0;',
+                  text,
+              )
               pbx.write_text(text)
               print(f'iOS bundle ID: {bundle}')
           PY
@@ -917,6 +922,11 @@ jobs:
               text = re.sub(
                   r'PRODUCT_BUNDLE_IDENTIFIER = [^;]+;',
                   f'PRODUCT_BUNDLE_IDENTIFIER = {bundle};',
+                  text,
+              )
+              text = re.sub(
+                  r'IPHONEOS_DEPLOYMENT_TARGET = [^;]+;',
+                  'IPHONEOS_DEPLOYMENT_TARGET = 15.0;',
                   text,
               )
               team = os.environ.get('IOS_TEAM_ID', '').strip()
