@@ -1135,7 +1135,8 @@ jobs:
           PY
 
           # Only override settings that are safe project-wide; profile identity lives in Runner pbxproj.
-          # CODE_SIGNING_ALLOWED=NO for Pods is handled by not passing PROVISIONING_PROFILE* here.
+          # Do NOT pass PROVISIONING_PROFILE* here — command-line overrides apply to Pods targets too,
+          # and Pods cannot accept provisioning profiles.
           xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
@@ -1146,9 +1147,6 @@ jobs:
             CODE_SIGNING_REQUIRED=YES \
             CODE_SIGNING_ALLOWED=YES \
             OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN_PATH" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
-            PROVISIONING_PROFILE="$PROFILE_UUID" \
-            -skipPackagePluginValidation \
             2>&1 | tee "$RUNNER_TEMP/xcodebuild_archive.log"
 
           if [ ! -d "$RUNNER_TEMP/Runner.xcarchive" ]; then
