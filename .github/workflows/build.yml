@@ -78,19 +78,24 @@ jobs:
   configure:
     name: Configure
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' }}
+    if: ${{ always() }}
     outputs:
       platform: ${{ steps.cfg.outputs.platform }}
     steps:
       - uses: actions/checkout@v4
       - id: cfg
         run: |
-          if [ -f ".pagepilot-build.json" ]; then
+          if [ "${GITHUB_EVENT_NAME}" = "push" ] && [ -f ".pagepilot-build.json" ]; then
             PLATFORM=$(python3 -c "import json; print(json.load(open('.pagepilot-build.json')).get('platform','android'))")
-            echo "platform=$PLATFORM" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ github.event.inputs.platform }}" ]; then
+            PLATFORM="${{ github.event.inputs.platform }}"
+          elif [ -n "${{ github.event.client_payload.platform }}" ]; then
+            PLATFORM="${{ github.event.client_payload.platform }}"
           else
-            echo "platform=android" >> "$GITHUB_OUTPUT"
+            PLATFORM=android
           fi
+          echo "platform=$PLATFORM" >> "$GITHUB_OUTPUT"
+          echo "Resolved platform: $PLATFORM"
 
   # ===========================================================================
   # Android Build — Signed release APK
@@ -99,7 +104,7 @@ jobs:
     name: Build Android APK
     runs-on: ubuntu-latest
     needs: [configure]
-    if: ${{ github.event.inputs.platform == 'android' || github.event.client_payload.platform == 'android' || (needs.configure.result == 'success' && needs.configure.outputs.platform == 'android') || (needs.configure.result == 'skipped' && !github.event.inputs.platform && !github.event.client_payload.platform) }}
+    if: ${{ always() && !cancelled() && (github.event.inputs.platform == 'android' || github.event.client_payload.platform == 'android' || needs.configure.outputs.platform == 'android' || (needs.configure.result != 'success' && !github.event.inputs.platform && !github.event.client_payload.platform && github.event_name != 'push')) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -353,7 +358,7 @@ jobs:
     name: Build iOS Simulator
     runs-on: macos-latest
     needs: [configure]
-    if: ${{ github.event.inputs.platform == 'ios' || github.event.client_payload.platform == 'ios' || (needs.configure.result == 'success' && needs.configure.outputs.platform == 'ios') }}
+    if: ${{ always() && !cancelled() && (github.event.inputs.platform == 'ios' || github.event.client_payload.platform == 'ios' || needs.configure.outputs.platform == 'ios') }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -535,7 +540,7 @@ jobs:
     name: Build iOS Release (App Store)
     runs-on: macos-latest
     needs: [configure]
-    if: ${{ github.event.inputs.platform == 'ios_release' || github.event.client_payload.platform == 'ios_release' || (needs.configure.result == 'success' && needs.configure.outputs.platform == 'ios_release') }}
+    if: ${{ always() && !cancelled() && (github.event.inputs.platform == 'ios_release' || github.event.client_payload.platform == 'ios_release' || needs.configure.outputs.platform == 'ios_release') }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -658,7 +663,6 @@ jobs:
                   "exp": now + 1200,
                   "aud": "appstoreconnect-v1",
                   "jti": str(uuid.uuid4()),
-                  "scope": ["GET", "POST", "DELETE"],
               },
               ASC_KEY,
               algorithm="ES256",
