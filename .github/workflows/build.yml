@@ -695,23 +695,22 @@ jobs:
           )
           csr_content = csr_pem.read_text()
 
-          # --- List existing distribution certs; delete extras (limit 5) ---
+          # --- List existing distribution certs; revoke as needed (we need private key we just generated) ---
           listing = api("GET", "/certificates?limit=100")
           dist_certs = [
               c for c in listing.get("data", [])
               if c.get("attributes", {}).get("certificateType") in ("IOS_DISTRIBUTION", "APPLE_DISTRIBUTION")
           ]
-          # Keep newest 4, delete older to stay under Apple's 5-cert cap
-          dist_certs.sort(key=lambda c: c.get("attributes", {}).get("expirationDate", ""), reverse=True)
-          for old in dist_certs[4:]:
+          # CI generates a fresh key each run — revoke prior distribution certs so we can create a matching one.
+          for old in dist_certs:
               try:
                   api("DELETE", f"/certificates/{old['id']}")
-                  print(f"Deleted old certificate {old['id']}")
+                  print(f"Revoked old certificate {old['id']}")
               except Exception as e:
-                  print(f"Warn: could not delete old cert: {e}")
+                  print(f"Warn: could not revoke old cert {old.get('id')}: {e}")
 
-          # --- Create certificate from CSR ---
-          cert_resp = api("POST", "/certificates", {
+          # --- Create certificate from CSR (retry once if race/pending request) ---
+          cert_payload = {
               "data": {
                   "type": "certificates",
                   "attributes": {
@@ -719,7 +718,24 @@ jobs:
                       "csrContent": csr_content,
                   },
               }
-          })
+          }
+          try:
+              cert_resp = api("POST", "/certificates", cert_payload)
+          except Exception as e:
+              print(f"First cert create failed, waiting and retrying: {e}")
+              time.sleep(5)
+              # Clear any pending request by revoking REQUEST-type certs if present
+              listing2 = api("GET", "/certificates?limit=100")
+              for c in listing2.get("data", []):
+                  ctype = c.get("attributes", {}).get("certificateType", "")
+                  if "IOS_DISTRIBUTION" in ctype or "APPLE_DISTRIBUTION" in ctype or ctype == "IOS_DISTRIBUTION":
+                      try:
+                          api("DELETE", f"/certificates/{c['id']}")
+                          print(f"Revoked {c['id']} ({ctype})")
+                      except Exception as e2:
+                          print(f"Warn revoke: {e2}")
+              time.sleep(2)
+              cert_resp = api("POST", "/certificates", cert_payload)
           cert_attrs = cert_resp["data"]["attributes"]
           cert_b64 = cert_attrs["certificateContent"]  # base64 DER
           cert_id = cert_resp["data"]["id"]
