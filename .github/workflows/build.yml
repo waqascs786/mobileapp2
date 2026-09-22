@@ -628,7 +628,18 @@ jobs:
           ISSUER = os.environ["ASC_ISSUER_ID"]
           BUNDLE = os.environ.get("PACKAGE_NAME", "com.pagepilot.app")
           APP_NAME = os.environ.get("APP_NAME", "PagePilot")
-          ASC_KEY = os.environ["ASC_PRIVATE_KEY"]
+          ASC_KEY = os.environ["ASC_PRIVATE_KEY"].strip().strip('"').strip("'")
+          if "-----BEGIN" not in ASC_KEY:
+              try:
+                  ASC_KEY = base64.b64decode(ASC_KEY, validate=False).decode("utf-8")
+              except Exception:
+                  pass
+          if "\\n" in ASC_KEY and "\n" not in ASC_KEY:
+              ASC_KEY = ASC_KEY.replace("\\n", "\n")
+          ASC_KEY = ASC_KEY.strip() + "\n"
+          if "-----BEGIN" not in ASC_KEY:
+              print("::error::ASC_PRIVATE_KEY is not a valid PEM private key.", file=sys.stderr)
+              sys.exit(1)
           TEMP = Path(os.environ["RUNNER_TEMP"])
           P12_OUT = TEMP / "pagepilot_auto.p12"
           PROFILE_OUT = TEMP / "pagepilot_auto.mobileprovision"
