@@ -784,15 +784,15 @@ jobs:
                   break
           if not app_res_id:
               try:
-                app_create = api("POST", "/apps", {
-                    "data": {
-                        "type": "apps",
-                        "attributes": {
-                            "name": re.sub(r'[^A-Za-z0-9 .-]', '', APP_NAME).strip() or "PagePilot App",
-                            "primaryLanguage": "en",
-                            "sku": f"PP{KEY_ID}{abs(hash(BUNDLE)) % 10**6}",
-                            "bundleId": BUNDLE,
-                        },
+                  app_create = api("POST", "/apps", {
+                      "data": {
+                          "type": "apps",
+                          "attributes": {
+                              "name": re.sub(r'[^A-Za-z0-9 .-]', '', APP_NAME).strip() or "PagePilot App",
+                              "primaryLanguage": "en",
+                              "sku": f"PP{KEY_ID}{abs(hash(BUNDLE)) % 10**6}",
+                              "bundleId": BUNDLE,
+                          },
                           "relationships": {
                               "bundleId": {"data": {"type": "bundleIds", "id": bundle_res_id}},
                           },
