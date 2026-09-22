@@ -1,8 +1,8 @@
 {
-    "trigger_id": "a00a95d1-0388-48d1-af55-587e6d80d28c",
+    "trigger_id": "020cd9af-0530-4fd7-88da-2e3170a7f4c7",
     "platform": "ios_release",
-    "app_name": "WP Mobile App 8",
-    "package_name": "com.app2.lifterapp",
+    "app_name": "WP Mobile App 3",
+    "package_name": "com.app3.lifterapp",
     "primary_color": "#0073aa",
     "api_url": "https://wpmobileapps.us23.cdn-alpha.com",
     "build_number": "1",
@@ -10,7 +10,7 @@
     "ios_team_id": "4FRC5AB7WK",
     "asc_key_id": "27R5DCZJ59",
     "asc_issuer_id": "d030b39b-d9b7-4128-88b5-ab386e267e7e",
-    "appetize_token": "tok_shrkovyjznwku4dj6o6asqywoq",
+    "appetize_token": "tok_ibz2kvzvpn75lbpmi2hcvlasae",
     "appetize_android_key": "x6xbpnsgl66lv5xjiglrd3kshi",
     "appetize_ios_key": ""
 }
