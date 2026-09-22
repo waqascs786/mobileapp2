@@ -571,18 +571,233 @@ jobs:
           fi
 
       - name: Verify Apple credentials
+        env:
+          P12_SET: ${{ secrets.APPLE_CERTIFICATE != '' && '1' || '0' }}
+          PROFILE_SET: ${{ secrets.APPLE_PROVISION_PROFILE != '' && '1' || '0' }}
+          ASC_KEY_SET: ${{ secrets.ASC_PRIVATE_KEY != '' && '1' || '0' }}
         run: |
           MISSING=0
           if [ -z "$IOS_TEAM_ID" ]; then echo "::error::IOS_TEAM_ID is missing"; MISSING=1; fi
           if [ -z "$ASC_KEY_ID" ]; then echo "::error::ASC_KEY_ID is missing"; MISSING=1; fi
           if [ -z "$ASC_ISSUER_ID" ]; then echo "::error::ASC_ISSUER_ID is missing"; MISSING=1; fi
-          if [ -z "${{ secrets.ASC_PRIVATE_KEY }}" ]; then echo "::error::ASC_PRIVATE_KEY secret is missing"; MISSING=1; fi
-          if [ -z "${{ secrets.APPLE_CERTIFICATE }}" ]; then echo "::error::APPLE_CERTIFICATE secret is missing"; MISSING=1; fi
-          if [ -z "${{ secrets.APPLE_PROVISION_PROFILE }}" ]; then echo "::error::APPLE_PROVISION_PROFILE secret is missing"; MISSING=1; fi
+          if [ "$ASC_KEY_SET" != "1" ]; then echo "::error::ASC_PRIVATE_KEY secret is missing"; MISSING=1; fi
+          # .p12 / .mobileprovision are optional when ASC API key has Admin role — workflow can create them.
+          if [ "$P12_SET" != "1" ] && [ "$PROFILE_SET" != "1" ]; then
+            echo "No .p12/.mobileprovision uploaded — will auto-create via App Store Connect API."
+          elif [ "$P12_SET" != "1" ] || [ "$PROFILE_SET" != "1" ]; then
+            echo "::error::Upload BOTH .p12 and .mobileprovision, or NEITHER (auto-generate with ASC key)."
+            MISSING=1
+          fi
           if [ "$MISSING" -ne 0 ]; then
-            echo "Configure Apple settings under PagePilot → GitHub Settings → Apple App Store Connect."
+            echo "Configure Apple settings under PagePilot → Apple App Store Connect."
             exit 1
           fi
+
+      - name: Auto-create Apple signing materials via ASC API
+        id: auto_sign
+        env:
+          P12_BASE64: ${{ secrets.APPLE_CERTIFICATE }}
+          P12_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.APPLE_PROVISION_PROFILE }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -n "${P12_BASE64:-}" ] && [ -n "${PROFILE_BASE64:-}" ]; then
+            echo "Using uploaded .p12 and .mobileprovision."
+            echo "p12_path=" >> "$GITHUB_OUTPUT"
+            echo "profile_path=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "${ASC_PRIVATE_KEY:-}" ]; then
+            echo "::error::ASC_PRIVATE_KEY is required to auto-generate signing materials."
+            exit 1
+          fi
+          echo "Auto-generating distribution certificate and provisioning profile..."
+          pip3 install --quiet --user 'PyJWT[crypto]' || pip3 install --quiet --user PyJWT cryptography
+          export PATH="$HOME/.local/bin:$PATH"
+          python3 - <<'PY'
+          import base64, json, os, subprocess, sys, time, uuid
+          from pathlib import Path
+          import jwt as pyjwt
+
+          TEAM = os.environ["IOS_TEAM_ID"]
+          KEY_ID = os.environ["ASC_KEY_ID"]
+          ISSUER = os.environ["ASC_ISSUER_ID"]
+          BUNDLE = os.environ.get("PACKAGE_NAME", "com.pagepilot.app")
+          APP_NAME = os.environ.get("APP_NAME", "PagePilot")
+          ASC_KEY = os.environ["ASC_PRIVATE_KEY"]
+          TEMP = Path(os.environ["RUNNER_TEMP"])
+          P12_OUT = TEMP / "pagepilot_auto.p12"
+          PROFILE_OUT = TEMP / "pagepilot_auto.mobileprovision"
+          P12_PASS = os.environ.get("P12_PASSWORD") or "pagepilot-auto"
+          API = "https://api.appstoreconnect.apple.com/v1"
+
+          def sh(*args, **kwargs):
+              return subprocess.run(args, check=True, capture_output, text=True, **kwargs).stdout
+
+          # --- JWT ---
+          now = int(time.time())
+          token = pyjwt.encode(
+              {
+                  "iss": ISSUER,
+                  "iat": now,
+                  "exp": now + 1200,
+                  "aud": "appstoreconnect-v1",
+                  "jti": str(uuid.uuid4()),
+                  "scope": ["GET", "POST", "DELETE"],
+              },
+              ASC_KEY,
+              algorithm="ES256",
+              headers={"kid": KEY_ID, "typ": "JWT", "alg": "ES256"},
+          )
+          headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+
+          import urllib.request
+          import urllib.error
+
+          def api(method, path, body=None):
+              data = json.dumps(body).encode() if body is not None else None
+              req = urllib.request.Request(API + path, data=data, headers=headers, method=method)
+              try:
+                  with urllib.request.urlopen(req) as resp:
+                      raw = resp.read()
+                      return json.loads(raw) if raw else {}
+              except urllib.error.HTTPError as e:
+                  err = e.read().decode(errors="replace")
+                  # 409 = already exists; caller may handle
+                  raise RuntimeError(f"{method} {path} -> HTTP {e.code}: {err}") from None
+
+          # --- RSA key + CSR ---
+          key_pem = TEMP / "dist_key.pem"
+          csr_pem = TEMP / "dist.csr"
+          sh("openssl", "genrsa", "-out", str(key_pem), "2048")
+          sh(
+              "openssl", "req", "-new", "-key", str(key_pem), "-out", str(csr_pem),
+                "-subj", f"/CN=PagePilot {APP_NAME}/O=PagePilot/C=US",
+          )
+          csr_content = csr_pem.read_text()
+
+          # --- List existing distribution certs; delete extras (limit 5) ---
+          listing = api("GET", "/certificates?limit=100")
+          dist_certs = [
+              c for c in listing.get("data", [])
+              if c.get("attributes", {}).get("certificateType") in ("IOS_DISTRIBUTION", "APPLE_DISTRIBUTION")
+          ]
+          # Keep newest 4, delete older to stay under Apple's 5-cert cap
+          dist_certs.sort(key=lambda c: c.get("attributes", {}).get("expirationDate", ""), reverse=True)
+          for old in dist_certs[4:]:
+              try:
+                  api("DELETE", f"/certificates/{old['id']}")
+                  print(f"Deleted old certificate {old['id']}")
+              except Exception as e:
+                  print(f"Warn: could not delete old cert: {e}")
+
+          # --- Create certificate from CSR ---
+          cert_resp = api("POST", "/certificates", {
+              "data": {
+                  "type": "certificates",
+                  "attributes": {
+                      "certificateType": "IOS_DISTRIBUTION",
+                      "csrContent": csr_content,
+                  },
+              }
+          })
+          cert_attrs = cert_resp["data"]["attributes"]
+          cert_b64 = cert_attrs["certificateContent"]  # base64 DER
+          cert_id = cert_resp["data"]["id"]
+          der = base64.b64decode(cert_b64)
+          cert_der = TEMP / "dist.der"
+          cert_der.write_bytes(der)
+          cert_pem = TEMP / "dist.crt"
+          sh("openssl", "x509", "-inform", "DER", "-in", str(cert_der), "-out", str(cert_pem))
+
+          # --- Package .p12 ---
+          sh(
+              "openssl", "pkcs12", "-export",
+              "-out", str(P12_OUT),
+              "-inkey", str(key_pem),
+              "-in", str(cert_pem),
+              "-passout", f"pass:{P12_PASS}",
+              "-name", "PagePilot Distribution",
+          )
+          print(f"Created {P12_OUT}")
+
+          # --- Ensure bundle ID (App ID) exists ---
+          bid_list = api("GET", f"/bundleIds?filter[identifier]={BUNDLE}&limit=100")
+          bundle_res_id = None
+          for b in bid_list.get("data", []):
+              if b.get("attributes", {}).get("identifier") == BUNDLE:
+                  bundle_res_id = b["id"]
+                  break
+          if not bundle_res_id:
+              bid_create = api("POST", "/bundleIds", {
+                  "data": {
+                      "type": "bundleIds",
+                      "attributes": {
+                          "identifier": BUNDLE,
+                          "name": f"{APP_NAME} ({BUNDLE})",
+                          "platform": "IOS",
+                          "seedId": TEAM,
+                      },
+                  }
+              })
+              bundle_res_id = bid_create["data"]["id"]
+              print(f"Registered App ID {BUNDLE} -> {bundle_res_id}")
+
+          # --- Ensure App Store Connect app record exists (required for App Store profiles) ---
+          apps = api("GET", f"/apps?filter[bundleId]={BUNDLE}&limit=10")
+          app_res_id = None
+          for a in apps.get("data", []):
+              if a.get("attributes", {}).get("bundleId") == BUNDLE:
+                  app_res_id = a["id"]
+                  break
+          if not app_res_id:
+              try:
+                  app_create = api("POST", "/apps", {
+                      "data": {
+                          "type": "apps",
+                          "attributes": {
+                              "name": APP_NAME,
+                              "primaryLanguage": "en",
+                              "sku": f"PP{abs(hash(BUNDLE)) % 10**10}",
+                              "bundleId": BUNDLE,
+                          },
+                          "relationships": {
+                              "bundleId": {"data": {"type": "bundleIds", "id": bundle_res_id}},
+                          },
+                      }
+                  })
+                  app_res_id = app_create["data"]["id"]
+                  print(f"Created App Store app record {app_res_id}")
+              except Exception as e:
+                  # App may already exist / race — continue; profile creation will surface real errors
+                  print(f"Warn: could not create app record (may already exist): {e}")
+
+          # --- Create App Store provisioning profile linked to this cert ---
+          profile_resp = api("POST", "/profiles", {
+              "data": {
+                  "type": "profiles",
+                  "attributes": {
+                      "name": f"PagePilot {BUNDLE} AppStore",
+                      "profileType": "IOS_APP_STORE",
+                  },
+                  "relationships": {
+                      "bundleId": {"data": {"type": "bundleIds", "id": bundle_res_id}},
+                      "certificates": {"data": [{"type": "certificates", "id": cert_id}]},
+                  },
+              }
+          })
+          profile_b64 = profile_resp["data"]["attributes"]["profileContent"]
+          PROFILE_OUT.write_bytes(base64.b64decode(profile_b64))
+          print(f"Created provisioning profile {PROFILE_OUT}")
+
+          # Persist outputs for later steps
+          out = Path(os.environ["GITHUB_OUTPUT"])
+          with out.open("a") as f:
+              f.write(f"p12_path={P12_OUT}\n")
+              f.write(f"p12_password={P12_PASS}\n")
+              f.write(f"profile_path={PROFILE_OUT}\n")
+          PY
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -662,17 +877,26 @@ jobs:
         env:
           P12_BASE64: ${{ secrets.APPLE_CERTIFICATE }}
           P12_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          AUTO_P12: ${{ steps.auto_sign.outputs.p12_path }}
+          AUTO_P12_PASSWORD: ${{ steps.auto_sign.outputs.p12_password }}
         run: |
           set -e
           KEYCHAIN_PATH="$RUNNER_TEMP/pagepilot-build.keychain-db"
           KEYCHAIN_PASSWORD="pagepilot"
-          echo "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/dist.p12"
+
+          if [ -n "${AUTO_P12:-}" ] && [ -f "$AUTO_P12" ]; then
+            cp "$AUTO_P12" "$RUNNER_TEMP/dist.p12"
+            IMPORT_PASS="${AUTO_P12_PASSWORD:-pagepilot-auto}"
+          else
+            echo "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/dist.p12"
+            IMPORT_PASS="$P12_PASSWORD"
+          fi
 
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" || true
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
-          security import "$RUNNER_TEMP/dist.p12" -k "$KEYCHAIN_PATH" -P "$P12_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security -f pkcs12
+          security import "$RUNNER_TEMP/dist.p12" -k "$KEYCHAIN_PATH" -P "$IMPORT_PASS" -T /usr/bin/codesign -T /usr/bin/security -f pkcs12
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
           echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> "$GITHUB_ENV"
@@ -680,11 +904,17 @@ jobs:
       - name: Install provisioning profile
         env:
           PROFILE_BASE64: ${{ secrets.APPLE_PROVISION_PROFILE }}
+          AUTO_PROFILE: ${{ steps.auto_sign.outputs.profile_path }}
         run: |
           set -e
           PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILE_DIR"
-          echo "$PROFILE_BASE64" | base64 --decode > "$RUNNER_TEMP/profile.mobileprovision"
+
+          if [ -n "${AUTO_PROFILE:-}" ] && [ -f "$AUTO_PROFILE" ]; then
+            cp "$AUTO_PROFILE" "$RUNNER_TEMP/profile.mobileprovision"
+          else
+            echo "$PROFILE_BASE64" | base64 --decode > "$RUNNER_TEMP/profile.mobileprovision"
+          fi
 
           # Extract UUID from the profile and install with the canonical name.
           UUID=$(security cms -D -i "$RUNNER_TEMP/profile.mobileprovision" | python3 -c "import sys,plistlib; print(plistlib.loads(sys.stdin.buffer.read())['UUID'])")
