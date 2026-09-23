@@ -928,11 +928,11 @@ class _LessonVideoPlayerState extends State<_LessonVideoPlayer> {
 
     // LifterLMS often stores a full iframe HTML string in _llms_video_embed.
     if (raw.contains('<iframe') || raw.contains('<video')) {
-      final srcMatch = RegExp(r'src=["\']([^"\']+)["\']').firstMatch(raw);
+      final srcMatch = RegExp('src=["\']([^"\']+)["\']').firstMatch(raw);
       if (srcMatch != null) {
         raw = srcMatch.group(1)!;
       } else {
-        final videoMatch = RegExp(r'<source[^>]+src=["\']([^"\']+)["\']').firstMatch(raw);
+        final videoMatch = RegExp('<source[^>]+src=["\']([^"\']+)["\']').firstMatch(raw);
         if (videoMatch != null) {
           raw = videoMatch.group(1)!;
         }
