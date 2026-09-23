@@ -1,11 +1,11 @@
 {
-    "trigger_id": "f55e49ed-5014-4e05-80aa-2c139c12f8e9",
+    "trigger_id": "43ed4744-b9bd-458f-aaaa-683f86a038a4",
     "platform": "android",
     "app_name": "WP Mobile App 3",
     "package_name": "com.app3.lifterapp",
     "primary_color": "#0073aa",
     "api_url": "https://wpmobileapps.us23.cdn-alpha.com",
-    "build_number": "3",
+    "build_number": "4",
     "app_icon_url": "https://wpmobileapps.us23.cdn-alpha.com/wp-content/uploads/2026/09/4456838.png",
     "ios_team_id": "4FRC5AB7WK",
     "asc_key_id": "27R5DCZJ59",
