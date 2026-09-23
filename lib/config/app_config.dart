@@ -60,8 +60,8 @@ class AppConfig {
 
   static Future<void> load() async {
     _instance = AppConfig._(
-      appName: 'WP Mobile App 3',
-      packageName: 'com.app3.lifterapp',
+      appName: 'WP Mobile App 4',
+      packageName: 'com.app4.lifterapp',
       primaryColor: Color(0xFF0073AA),
       secondaryColor: Color(0xFF005177),
       accentColor: Color(0xFF00AADC),
