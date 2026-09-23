@@ -452,7 +452,9 @@ class _CourseListScreenState extends State<CourseListScreen> {
                   price: course.price,
                   salePrice: course.salePrice,
                   isFree: course.isFree,
-                  progress: course.isEnrolled ? course.progress : null,
+                  progress: course.isEnrolled
+                      ? (course.progress / 100).clamp(0.0, 1.0)
+                      : null,
                   isEnrolled: course.isEnrolled,
                   mode: CourseCardMode.grid,
                   onTap: () => Navigator.of(context).push(
@@ -499,7 +501,9 @@ class _CourseListScreenState extends State<CourseListScreen> {
                 price: course.price,
                 salePrice: course.salePrice,
                 isFree: course.isFree,
-                progress: course.isEnrolled ? course.progress : null,
+                progress: course.isEnrolled
+                      ? (course.progress / 100).clamp(0.0, 1.0)
+                      : null,
                 isEnrolled: course.isEnrolled,
                 mode: CourseCardMode.list,
                 onTap: () => Navigator.of(context).push(

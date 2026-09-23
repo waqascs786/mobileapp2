@@ -60,8 +60,8 @@ class AppConfig {
 
   static Future<void> load() async {
     _instance = AppConfig._(
-      appName: 'WP Mobile App 4',
-      packageName: 'com.app4.lifterapp',
+      appName: 'WP Mobile App 3',
+      packageName: 'com.app3.lifterapp',
       primaryColor: Color(0xFF0073AA),
       secondaryColor: Color(0xFF005177),
       accentColor: Color(0xFF00AADC),
@@ -71,8 +71,8 @@ class AppConfig {
       siteUrl: 'https://wpmobileapps.us23.cdn-alpha.com',
       apiBaseUrl: 'https://wpmobileapps.us23.cdn-alpha.com/wp-json',
       wpBaseUrl: 'https://wpmobileapps.us23.cdn-alpha.com',
-      logoAsset: '',
-      appTagline: 'Learn anytime, anywhere',
+      logoAsset: 'assets/images/app_icon.png',
+      appTagline: 'WP Mobile App 3',
       categories: [],
       screens: {
         'home': true,

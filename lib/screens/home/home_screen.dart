@@ -129,14 +129,13 @@ class _HomeScreenState extends State<HomeScreen> {
         slivers: [
           SliverToBoxAdapter(child: _buildWelcomeBanner(config)),
           SliverToBoxAdapter(child: _buildSearchBar(config)),
-          if (_enrolledCourses.isNotEmpty)
-            SliverToBoxAdapter(child: _buildSectionHeader('Continue Learning', config)),
-          if (_enrolledCourses.isNotEmpty)
+          SliverToBoxAdapter(child: _buildSectionHeader('My Courses', config)),
+          if (_enrolledCourses.isEmpty && !_isLoadingFeatured)
+            SliverToBoxAdapter(child: _buildEmptySection('No enrolled courses yet'))
+          else
             SliverToBoxAdapter(child: _buildEnrolledCarousel(config)),
-          SliverToBoxAdapter(child: _buildSectionHeader('Featured Courses', config)),
+          SliverToBoxAdapter(child: _buildSectionHeader('Browse Courses', config)),
           SliverToBoxAdapter(child: _buildFeaturedCourses(config)),
-          SliverToBoxAdapter(child: _buildSectionHeader('Popular Courses', config)),
-          SliverToBoxAdapter(child: _buildPopularCourses(config)),
           SliverToBoxAdapter(child: _buildSectionHeader('Categories', config)),
           SliverToBoxAdapter(child: _buildCategoriesGrid(config)),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
@@ -571,17 +570,17 @@ class _EnrolledCourseCard extends StatelessWidget {
                         ClipRRect(
                           borderRadius: BorderRadius.circular(4),
                           child: LinearProgressIndicator(
-                            value: course.progress,
+                            value: (course.progress / 100).clamp(0.0, 1.0),
                             backgroundColor: Colors.grey.shade200,
                             valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
                             minHeight: 5,
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          '${(course.progress * 100).toInt()}% Complete',
-                          style: TextStyle(fontSize: 11, color: primaryColor, fontWeight: FontWeight.w600),
-                        ),
+                    Text(
+                      '${(course.progress).clamp(0, 100).toInt()}% Complete',
+                      style: TextStyle(fontSize: 11, color: primaryColor, fontWeight: FontWeight.w600),
+                    ),
                       ],
                     ),
                   ],

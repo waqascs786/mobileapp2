@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/course.dart';
+import '../../services/api_service.dart';
+import '../courses/course_detail_screen.dart';
+
 // ─── Models ──────────────────────────────────────────────────────────────────
 
 class CourseItem {
@@ -76,12 +80,29 @@ class MyCoursesProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // TODO: Replace with actual API call
-      // final response = await http.get(Uri.parse('$apiBase/user/courses'));
-      // _allCourses = (jsonDecode(response.body) as List)
-      //     .map((e) => CourseItem.fromJson(e)).toList();
-
-      _allCourses = _getDemoCourses();
+      final courses = await ApiService.instance.getEnrolledCourses();
+      _allCourses = courses
+          .map((c) {
+            final pct = c.progress; // API returns 0–100
+            final norm = (pct / 100).clamp(0.0, 1.0);
+            return CourseItem(
+              id: c.id.toString(),
+              title: c.title,
+              thumbnailUrl: c.thumbnail.isNotEmpty ? c.thumbnail : null,
+              instructorName:
+                  c.instructor.name.isNotEmpty ? c.instructor.name : null,
+              progress: norm,
+              status: norm >= 1.0
+                  ? 'completed'
+                  : norm > 0
+                      ? 'in_progress'
+                      : 'all',
+              category: c.categories.isNotEmpty ? c.categories.first : null,
+              totalLessons: c.lessonsCount,
+              lastAccessedAt: null,
+            );
+          })
+          .toList();
       _applyFilters();
     } catch (e) {
       _error = 'Failed to load courses';
@@ -138,98 +159,6 @@ class MyCoursesProvider extends ChangeNotifier {
 
   Future<void> refresh() async => loadCourses();
 
-  static List<CourseItem> _getDemoCourses() {
-    return const [
-      CourseItem(
-        id: 'c1',
-        title: 'Flutter Complete Development Course',
-        instructorName: 'Sarah Johnson',
-        progress: 0.75,
-        status: 'in_progress',
-        category: 'Mobile Development',
-        rating: 4.8,
-        totalLessons: 42,
-        lastAccessedAt: '2026-09-10T10:00:00',
-      ),
-      CourseItem(
-        id: 'c2',
-        title: 'Dart Programming Fundamentals',
-        instructorName: 'Mike Chen',
-        progress: 1.0,
-        status: 'completed',
-        category: 'Programming',
-        rating: 4.6,
-        totalLessons: 28,
-        lastAccessedAt: '2026-09-08T15:30:00',
-      ),
-      CourseItem(
-        id: 'c3',
-        title: 'Advanced State Management',
-        instructorName: 'Emily Davis',
-        progress: 0.3,
-        status: 'in_progress',
-        category: 'Mobile Development',
-        rating: 4.7,
-        totalLessons: 35,
-        lastAccessedAt: '2026-09-11T08:00:00',
-      ),
-      CourseItem(
-        id: 'c4',
-        title: 'UI/UX Design Principles',
-        instructorName: 'Alex Kim',
-        progress: 1.0,
-        status: 'completed',
-        category: 'Design',
-        rating: 4.5,
-        totalLessons: 20,
-        lastAccessedAt: '2026-08-20T12:00:00',
-      ),
-      CourseItem(
-        id: 'c5',
-        title: 'RESTful API Development',
-        instructorName: 'James Wilson',
-        progress: 0.45,
-        status: 'in_progress',
-        category: 'Backend',
-        rating: 4.4,
-        totalLessons: 30,
-        lastAccessedAt: '2026-09-09T14:00:00',
-      ),
-      CourseItem(
-        id: 'c6',
-        title: 'iOS Development with Swift',
-        instructorName: 'Lisa Park',
-        progress: 1.0,
-        status: 'completed',
-        category: 'Mobile Development',
-        rating: 4.9,
-        totalLessons: 50,
-        lastAccessedAt: '2026-07-15T09:00:00',
-      ),
-      CourseItem(
-        id: 'c7',
-        title: 'Git & Version Control',
-        instructorName: 'Tom Brown',
-        progress: 1.0,
-        status: 'completed',
-        category: 'DevOps',
-        rating: 4.3,
-        totalLessons: 15,
-        lastAccessedAt: '2026-06-10T11:00:00',
-      ),
-      CourseItem(
-        id: 'c8',
-        title: 'Firebase for Mobile Apps',
-        instructorName: 'Nina Lee',
-        progress: 0.0,
-        status: 'all',
-        category: 'Backend',
-        rating: 4.7,
-        totalLessons: 25,
-        lastAccessedAt: null,
-      ),
-    ];
-  }
 }
 
 // ─── My Courses Screen ───────────────────────────────────────────────────────
@@ -353,10 +282,11 @@ class _MyCoursesScreenState extends State<MyCoursesScreen>
         return _CourseCard(
           course: course,
           onTap: () {
-            Navigator.pushNamed(
+            Navigator.push(
               context,
-              '/course-detail',
-              arguments: course.id,
+              MaterialPageRoute(
+                builder: (_) => CourseDetailScreen(courseId: course.id),
+              ),
             );
           },
         );

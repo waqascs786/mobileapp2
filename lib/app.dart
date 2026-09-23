@@ -12,6 +12,7 @@ import 'screens/courses/course_detail_screen.dart';
 import 'screens/lessons/lesson_screen.dart';
 import 'screens/quiz/quiz_screen.dart';
 import 'screens/profile/profile_screen.dart';
+import 'screens/profile/my_courses_screen.dart';
 import 'screens/wishlist/wishlist_screen.dart';
 import 'screens/settings/settings_screen.dart';
 
@@ -60,6 +61,10 @@ class PagePilotApp extends StatelessWidget {
                 }
                 return MaterialPageRoute(
                   builder: (_) => const LessonScreen(courseId: '0', courseTitle: ''),
+                );
+              case '/my-courses':
+                return MaterialPageRoute(
+                  builder: (_) => const MyCoursesScreen(),
                 );
               case '/quiz':
                 if (args is Map<String, dynamic>) {

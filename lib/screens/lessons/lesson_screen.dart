@@ -158,7 +158,9 @@ class LessonProvider extends ChangeNotifier {
             id: id,
             title: item['title'] as String? ?? '',
             content: item['content'] as String?,
-            videoUrl: item['videoUrl'] as String?,
+            videoUrl: item['videoUrl'] as String? ??
+                item['video_embed'] as String? ??
+                item['video_embed_url'] as String?,
             isCompleted: item['isCompleted'] as bool? ?? false,
             sortOrder: 0,
             sectionId: '',
@@ -204,7 +206,7 @@ class LessonProvider extends ChangeNotifier {
 
   Future<void> markAsComplete(String lessonId) async {
     try {
-      await ApiService.instance.post(
+      final result = await ApiService.instance.post(
         'lessonComplete',
         pathParams: {'id': lessonId},
       );
@@ -225,10 +227,14 @@ class LessonProvider extends ChangeNotifier {
           }
         }
       }
+      _error = null;
       notifyListeners();
+      // result may include updated progress — refresh is handled by UI.
+      return;
     } catch (e) {
       _error = 'Failed to mark lesson as complete';
       notifyListeners();
+      rethrow;
     }
   }
 
@@ -509,8 +515,22 @@ class _LessonScreenState extends State<LessonScreen> {
             if (_provider.currentLesson != null &&
                 !_provider.currentLesson!.isCompleted)
               TextButton.icon(
-                onPressed: () =>
-                    _provider.markAsComplete(_provider.currentLesson!.id),
+                onPressed: () async {
+                  try {
+                    await _provider.markAsComplete(_provider.currentLesson!.id);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Lesson marked complete')),
+                      );
+                    }
+                  } catch (_) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Failed to mark complete')),
+                      );
+                    }
+                  }
+                },
                 icon: const Icon(Icons.check_circle_outline, size: 20),
                 label: const Text('Complete'),
               ),
@@ -755,6 +775,9 @@ class _LessonScreenState extends State<LessonScreen> {
   }
 
   Widget _buildBottomNavigation(BuildContext context, ThemeData theme) {
+    final current = _provider.currentLesson;
+    final isComplete = current?.isCompleted == true;
+
     return Container(
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
@@ -776,25 +799,66 @@ class _LessonScreenState extends State<LessonScreen> {
         children: [
           Expanded(
             child: OutlinedButton.icon(
-              onPressed: _provider.hasPrevious ? _provider.previousLesson : null,
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
               icon: const Icon(Icons.arrow_back, size: 18),
-              label: const Text('Previous'),
+              label: const Text('Back to Course'),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
           ),
           const SizedBox(width: 12),
-          Expanded(
-            child: FilledButton.icon(
-              onPressed: _provider.hasNext ? _provider.nextLesson : null,
-              icon: const Icon(Icons.arrow_forward, size: 18),
-              label: const Text('Next'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
+          if (isComplete && _provider.hasNext)
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: _provider.nextLesson,
+                icon: const Icon(Icons.arrow_forward, size: 18),
+                label: const Text('Next'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            )
+          else if (!isComplete)
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: () async {
+                  if (current == null) return;
+                  try {
+                    await _provider.markAsComplete(current.id);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Lesson complete — back to course or continue')),
+                      );
+                    }
+                  } catch (_) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Failed to mark complete')),
+                      );
+                    }
+                  }
+                },
+                icon: const Icon(Icons.check_circle_outline, size: 18),
+                label: const Text('Mark Complete'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            )
+          else
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.check, size: 18),
+                label: const Text('Done — Back'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -860,30 +924,52 @@ class _LessonVideoPlayerState extends State<_LessonVideoPlayer> {
   }
 
   String? _buildEmbedUrl(String url) {
-    // YouTube
-    final ytMatch = RegExp(r'(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([A-Za-z0-9_-]{11})').firstMatch(url);
+    var raw = url.trim();
+
+    // LifterLMS often stores a full iframe HTML string in _llms_video_embed.
+    if (raw.contains('<iframe') || raw.contains('<video')) {
+      final srcMatch = RegExp(r'src=["\']([^"\']+)["\']').firstMatch(raw);
+      if (srcMatch != null) {
+        raw = srcMatch.group(1)!;
+      } else {
+        final videoMatch = RegExp(r'<source[^>]+src=["\']([^"\']+)["\']').firstMatch(raw);
+        if (videoMatch != null) {
+          raw = videoMatch.group(1)!;
+        }
+      }
+    }
+
+    // YouTube (watch, youtu.be, embed, shorts)
+    final ytMatch = RegExp(
+      r'(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/|youtube\.com/shorts/)([A-Za-z0-9_-]{11})',
+    ).firstMatch(raw);
     if (ytMatch != null) {
       final id = ytMatch.group(1);
-      return 'https://www.youtube.com/embed/$id?playsinline=1&rel=0&modestbranding=1';
+      return 'https://www.youtube.com/embed/$id?playsinline=1&rel=0&modestbranding=1&autoplay=1';
     }
 
     // Vimeo
-    final vimeoMatch = RegExp(r'(?:vimeo\.com/)(\d+)').firstMatch(url);
+    final vimeoMatch = RegExp(r'(?:vimeo\.com/)(\d+)').firstMatch(raw);
     if (vimeoMatch != null) {
       final id = vimeoMatch.group(1);
       return 'https://player.vimeo.com/video/$id?playsinline=1';
     }
 
     // Wistia
-    final wistiaMatch = RegExp(r'wistia\.(?:com|net)/(?:medias|embed/medias)/([A-Za-z0-9]+)').firstMatch(url);
+    final wistiaMatch = RegExp(r'wistia\.(?:com|net)/(?:medias|embed/medias)/([A-Za-z0-9]+)').firstMatch(raw);
     if (wistiaMatch != null) {
       final id = wistiaMatch.group(1);
       return 'https://fast.wistia.net/embed/medias/$id';
     }
 
-    // Direct video URL (mp4, etc) — return as-is for WebView
-    if (RegExp(r'\.(mp4|webm|ogg)(\?|$)', caseSensitive: false).hasMatch(url)) {
-      return url;
+    // Direct video URL (mp4, webm, ogg, m3u8)
+    if (RegExp(r'\.(mp4|webm|ogg|m3u8)(\?|$)', caseSensitive: false).hasMatch(raw)) {
+      return raw;
+    }
+
+    // Already an embed URL
+    if (raw.startsWith('http') && (raw.contains('/embed/') || raw.contains('player.vimeo'))) {
+      return raw;
     }
 
     return null;

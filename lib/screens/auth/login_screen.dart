@@ -164,6 +164,13 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildHeader(AppConfig config, Size size) {
+    final logoUrl = config.logoAsset.isNotEmpty
+        ? config.logoAsset
+        : (config.features['logoUrl'] as String?) ?? '';
+    final tagline = config.appTagline.isNotEmpty
+        ? config.appTagline
+        : 'Sign in to continue learning';
+
     return Column(
       children: [
         Container(
@@ -175,14 +182,14 @@ class _LoginScreenState extends State<LoginScreen> {
             borderRadius: BorderRadius.circular(24),
           ),
           child: Center(
-            child: config.logoAsset.isNotEmpty
-                ? Image.asset(config.logoAsset, width: size.width * 0.12, fit: BoxFit.contain)
+            child: logoUrl.isNotEmpty
+                ? Image.asset(logoUrl, width: size.width * 0.12, fit: BoxFit.contain)
                 : Icon(Icons.school_rounded, size: size.width * 0.1, color: config.primaryColor),
           ),
         ),
         const SizedBox(height: 16),
         Text(
-          'Welcome Back',
+          config.appName,
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.bold,
@@ -191,7 +198,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Sign in to continue learning',
+          tagline,
           style: TextStyle(
             fontSize: 15,
             color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
