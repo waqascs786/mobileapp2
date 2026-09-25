@@ -136,7 +136,7 @@ class LessonProvider extends ChangeNotifier {
 
   String get currentNote => _notes[_currentLesson?.id] ?? '';
 
-  Future<void> loadCourseContent(String courseId) async {
+  Future<void> loadCourseContent(String courseId, {String? startLessonId}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -178,8 +178,14 @@ class LessonProvider extends ChangeNotifier {
       }
 
       if (_flatLessons.isNotEmpty) {
-        _currentLesson = _flatLessons.first;
-        _currentIndex = 0;
+        // Start at the requested lesson when deep-linked from the course page.
+        var startIndex = 0;
+        if (startLessonId != null && startLessonId.isNotEmpty) {
+          final idx = _flatLessons.indexWhere((l) => l.id == startLessonId);
+          if (idx >= 0) startIndex = idx;
+        }
+        _currentIndex = startIndex;
+        _currentLesson = _flatLessons[startIndex];
       }
     } catch (e) {
       _error = 'Failed to load course content: $e';
@@ -225,6 +231,11 @@ class LessonProvider extends ChangeNotifier {
               sortOrder: section.lessons[i].sortOrder,
               sectionId: section.lessons[i].sectionId,
             );
+            // Keep the current lesson reference in sync so the bottom bar
+            // switches from "Mark Complete" to "Next" immediately.
+            if (_currentLesson?.id == lessonId) {
+              _currentLesson = section.lessons[i];
+            }
           }
         }
       }
@@ -345,11 +356,13 @@ class LessonScreen extends StatefulWidget {
   static const route = '/lesson';
   final String courseId;
   final String courseTitle;
+  final String? lessonId;
 
   const LessonScreen({
     super.key,
     required this.courseId,
     required this.courseTitle,
+    this.lessonId,
   });
 
   @override
@@ -367,7 +380,7 @@ class _LessonScreenState extends State<LessonScreen> {
     super.initState();
     _provider = LessonProvider();
     _provider.addListener(_onProviderUpdate);
-    _provider.loadCourseContent(widget.courseId);
+    _provider.loadCourseContent(widget.courseId, startLessonId: widget.lessonId);
     _provider.loadNotes();
   }
 

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../services/api_service.dart';
+
 // ─── Models ──────────────────────────────────────────────────────────────────
 
 class UserProfile {
@@ -12,7 +14,6 @@ class UserProfile {
   final int enrolledCourses;
   final int completedCourses;
   final int inProgressCourses;
-  final int certificates;
 
   const UserProfile({
     required this.id,
@@ -22,21 +23,7 @@ class UserProfile {
     this.enrolledCourses = 0,
     this.completedCourses = 0,
     this.inProgressCourses = 0,
-    this.certificates = 0,
   });
-
-  factory UserProfile.fromJson(Map<String, dynamic> json) {
-    return UserProfile(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      email: json['email'] as String,
-      avatarUrl: json['avatarUrl'] as String?,
-      enrolledCourses: json['enrolledCourses'] as int? ?? 0,
-      completedCourses: json['completedCourses'] as int? ?? 0,
-      inProgressCourses: json['inProgressCourses'] as int? ?? 0,
-      certificates: json['certificates'] as int? ?? 0,
-    );
-  }
 }
 
 // ─── Profile Provider ────────────────────────────────────────────────────────
@@ -56,18 +43,27 @@ class ProfileProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // TODO: Replace with actual API call
-      // final response = await http.get(Uri.parse('$apiBase/user/profile'));
-      // _profile = UserProfile.fromJson(jsonDecode(response.body));
+      final data = await ApiService.instance.getProfile();
+      if (data['success'] == false || data['id'] == null) {
+        throw Exception(data['message'] ?? 'Profile not found');
+      }
 
-      _profile = const UserProfile(
-        id: 'u1',
-        name: 'John Doe',
-        email: 'john.doe@example.com',
-        enrolledCourses: 12,
-        completedCourses: 8,
-        inProgressCourses: 3,
-        certificates: 8,
+      final enrolled = (data['enrolled_count'] as num?)?.toInt() ?? 0;
+      final completed = (data['completed_count'] as num?)?.toInt() ?? 0;
+      final name = (data['display_name'] as String?)?.trim();
+      final username = (data['username'] as String?)?.trim();
+      final avatar = (data['avatar'] as String?)?.trim();
+
+      _profile = UserProfile(
+        id: data['id']?.toString() ?? '',
+        name: (name != null && name.isNotEmpty)
+            ? name
+            : ((username != null && username.isNotEmpty) ? username : 'Student'),
+        email: data['email'] as String? ?? '',
+        avatarUrl: (avatar != null && avatar.isNotEmpty) ? avatar : null,
+        enrolledCourses: enrolled,
+        completedCourses: completed,
+        inProgressCourses: (enrolled - completed) > 0 ? enrolled - completed : 0,
       );
     } catch (e) {
       _error = 'Failed to load profile';
@@ -219,13 +215,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     color: Colors.green,
                   ),
                 ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
+                const SizedBox(width: 8),
                 Expanded(
                   child: _StatCard(
                     label: 'In Progress',
@@ -234,20 +224,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     color: Colors.orange,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _StatCard(
-                    label: 'Certificates',
-                    value: profile.certificates,
-                    icon: Icons.workspace_premium,
-                    color: Colors.purple,
-                  ),
-                ),
               ],
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
 
           // Menu items
           _MenuSection(
@@ -258,34 +239,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onTap: () => Navigator.pushNamed(context, '/my-courses'),
               ),
               _MenuItem(
-                icon: Icons.workspace_premium,
-                title: 'Certificates',
-                onTap: () {},
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          _MenuSection(
-            children: [
-              _MenuItem(
-                icon: Icons.edit_outlined,
-                title: 'Edit Profile',
-                onTap: () {},
-              ),
-              _MenuItem(
                 icon: Icons.settings_outlined,
                 title: 'Settings',
                 onTap: () => Navigator.pushNamed(context, '/settings'),
-              ),
-              _MenuItem(
-                icon: Icons.help_outline,
-                title: 'Help & Support',
-                onTap: () {},
-              ),
-              _MenuItem(
-                icon: Icons.info_outline,
-                title: 'About',
-                onTap: () {},
               ),
             ],
           ),

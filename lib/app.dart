@@ -56,6 +56,7 @@ class PagePilotApp extends StatelessWidget {
                     builder: (_) => LessonScreen(
                       courseId: args['courseId']?.toString() ?? '0',
                       courseTitle: args['courseTitle']?.toString() ?? '',
+                      lessonId: args['lessonId']?.toString(),
                     ),
                   );
                 }

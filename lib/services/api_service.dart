@@ -415,4 +415,37 @@ class ApiService {
   Future<Map<String, dynamic>> removeFromWishlist(String courseId) async {
     return delete('wishlistItem', pathParams: {'id': courseId});
   }
+
+  // ── Quiz endpoints ──
+
+  Future<Map<String, dynamic>> getQuiz(String quizId) async {
+    final result = await get('quiz', pathParams: {'id': quizId});
+    final data = result['data'];
+    if (result['success'] == true && data is Map<String, dynamic>) {
+      return data;
+    }
+    throw ApiException(
+      result['message'] as String? ?? 'Failed to load quiz.',
+      statusCode: 0,
+    );
+  }
+
+  Future<Map<String, dynamic>> submitQuizAnswers(
+    String quizId,
+    Map<String, dynamic> answers,
+  ) async {
+    final result = await post(
+      'quizSubmit',
+      pathParams: {'id': quizId},
+      body: {'answers': answers},
+    );
+    final data = result['data'];
+    if (result['success'] == true && data is Map<String, dynamic>) {
+      return data;
+    }
+    throw ApiException(
+      result['message'] as String? ?? 'Failed to submit quiz.',
+      statusCode: 0,
+    );
+  }
 }

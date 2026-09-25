@@ -14,6 +14,7 @@ on:
         type: choice
         options:
           - android
+          - aab
           - ios
           - ios_release
       app_name:
@@ -380,7 +381,250 @@ jobs:
             echo "Warning: Appetize.io upload failed with HTTP $HTTP_CODE"
           fi
 
+
   # ===========================================================================
+  # Android AAB Build — Signed release App Bundle (Google Play)
+  # ===========================================================================
+  build-android-aab:
+    name: Build Android AAB (Play Store)
+    runs-on: ubuntu-latest
+    needs: [configure]
+    if: ${{ always() && !cancelled() && (github.event.inputs.platform == 'aab' || github.event.client_payload.platform == 'aab' || needs.configure.outputs.platform == 'aab' || (needs.configure.result != 'success' && !github.event.inputs.platform && !github.event.client_payload.platform && github.event_name != 'push')) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Read build config (push events)
+        if: github.event_name == 'push'
+        run: |
+          if [ -f ".pagepilot-build.json" ]; then
+            python3 -c "
+          import json, os
+          with open('.pagepilot-build.json') as f:
+              cfg = json.load(f)
+          out = os.environ['GITHUB_ENV']
+          mapping = {
+              'platform': 'PLATFORM',
+              'app_name': 'APP_NAME',
+              'package_name': 'PACKAGE_NAME',
+              'primary_color': 'PRIMARY_COLOR',
+              'api_url': 'API_URL',
+              'build_number': 'BUILD_NUMBER',
+              'app_icon_url': 'APP_ICON_URL',
+              'ios_team_id': 'IOS_TEAM_ID',
+              'asc_key_id': 'ASC_KEY_ID',
+              'asc_issuer_id': 'ASC_ISSUER_ID',
+              'appetize_token': 'APPETIZE_TOKEN',
+              'appetize_android_key': 'APPETIZE_ANDROID_KEY',
+              'appetize_ios_key': 'APPETIZE_IOS_KEY',
+          }
+          with open(out, 'a') as o:
+              for key, env_key in mapping.items():
+                  val = cfg.get(key, '')
+                  if val:
+                      o.write(f'{env_key}={val}\n')
+          "
+            echo "Build config loaded from .pagepilot-build.json"
+          fi
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Save our Dart code
+        run: |
+          cp -R lib /tmp/pagepilot_lib
+          cp pubspec.yaml /tmp/pagepilot_pubspec.yaml
+          cp pubspec.lock /tmp/pagepilot_pubspec.lock 2>/dev/null || true
+          cp analysis_options.yaml /tmp/pagepilot_analysis.yaml 2>/dev/null || true
+          cp flutter_launcher_icons.yaml /tmp/pagepilot_icons.yaml 2>/dev/null || true
+
+      - name: Generate Flutter scaffold
+        run: |
+          # Derive org and project name from PACKAGE_NAME (e.g. com.pagepilot.app -> org=com.pagepilot, project=app)
+          PKG="${{ env.PACKAGE_NAME }}"
+          LAST="${PKG##*.}"
+          ORG="${PKG%.$LAST}"
+          # Dart package names must be lowercase_with_underscores.
+          PROJ=$(echo "$LAST" | tr '[:upper:]' '[:lower:]' | tr '-' '_')
+          flutter create --project-name "$PROJ" --org "$ORG" --platforms android .
+          cp /tmp/pagepilot_pubspec.yaml pubspec.yaml
+          cp /tmp/pagepilot_pubspec.lock pubspec.lock 2>/dev/null || true
+          cp /tmp/pagepilot_analysis.yaml analysis_options.yaml 2>/dev/null || true
+          cp /tmp/pagepilot_icons.yaml flutter_launcher_icons.yaml 2>/dev/null || true
+          rm -rf test/
+          sed -i 's/id "org.jetbrains.kotlin.android" version ".*"/id "org.jetbrains.kotlin.android" version "2.0.0"/' android/settings.gradle
+          if ! grep -q "android.permission.INTERNET" android/app/src/main/AndroidManifest.xml; then
+            sed -i '/<manifest/a\    <uses-permission android:name="android.permission.INTERNET"/>' android/app/src/main/AndroidManifest.xml
+          fi
+
+      - name: Apply app name to Android manifest
+        run: |
+          python3 <<'PY'
+          import os, re, pathlib
+          app_name = os.environ.get('APP_NAME', 'PagePilot').replace('"', '\\"')
+          manifest = pathlib.Path('android/app/src/main/AndroidManifest.xml')
+          text = manifest.read_text()
+          text = re.sub(r'android:label="[^"]*"', f'android:label="{app_name}"', text, count=1)
+          manifest.write_text(text)
+          print(f'Android label set to: {app_name}')
+          PY
+
+      - name: Download app icon and generate launcher icons
+        if: env.APP_ICON_URL != ''
+        run: |
+          set -e
+          mkdir -p assets/images
+          flutter pub get
+          curl -fsSL "${APP_ICON_URL}" -o assets/images/app_icon.png
+          # Some CDNs serve WebP under a .png name — convert to real PNG for flutter_launcher_icons.
+          if file assets/images/app_icon.png | grep -qi 'web/p\|webp'; then
+            if command -v sips >/dev/null 2>&1; then
+              sips -s format png assets/images/app_icon.png --out assets/images/app_icon_converted.png >/dev/null
+              mv assets/images/app_icon_converted.png assets/images/app_icon.png
+            else
+              python3 - <<'PY'
+          from pathlib import Path
+          try:
+              from PIL import Image
+          except ImportError:
+              raise SystemExit(0)
+          p = Path('assets/images/app_icon.png')
+          img = Image.open(p)
+          img.save(p, format='PNG')
+          PY
+            fi
+          fi
+          BG="${PRIMARY_COLOR:-#FFFFFF}"
+          printf '%s\n' \
+            'flutter_launcher_icons:' \
+            '  android: true' \
+            '  ios: false' \
+            '  image_path: "assets/images/app_icon.png"' \
+            "  adaptive_icon_background: \"${BG}\"" \
+            '  adaptive_icon_foreground: "assets/images/app_icon.png"' \
+            > flutter_launcher_icons.yaml
+          echo "flutter_launcher_icons.yaml:"
+          cat flutter_launcher_icons.yaml
+          dart run flutter_launcher_icons
+
+      - name: Restore Dart code
+        run: |
+          rm -rf lib
+          cp -R /tmp/pagepilot_lib lib
+
+      # Android release keystore: decode from secret if available, else generate a new one.
+      - name: Setup Android signing keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS_SECRET: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS_SECRET: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          KEYSTORE_DIR="$HOME/.android-keystore"
+          mkdir -p "$KEYSTORE_DIR"
+          KEYSTORE_PATH="$KEYSTORE_DIR/release-key.jks"
+
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "Decoding existing keystore from repository secret..."
+            echo "$KEYSTORE_B64" | base64 -d > "$KEYSTORE_PATH"
+            KEYSTORE_PASSWORD="$STORE_PASS"
+            KEY_ALIAS="${KEY_ALIAS_SECRET:-pagepilot}"
+            KEY_PASSWORD="$KEY_PASS_SECRET"
+          else
+            echo "No keystore found in secrets. Generating a new one..."
+            KEYSTORE_PASSWORD="pagepilot123"
+            KEY_ALIAS="pagepilot"
+            KEY_PASSWORD="pagepilot123"
+
+            keytool -genkeypair -v \
+              -keystore "$KEYSTORE_PATH" \
+              -alias "$KEY_ALIAS" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass "$KEYSTORE_PASSWORD" \
+              -keypass "$KEY_PASSWORD" \
+              -dname "CN=PagePilot, OU=Mobile, O=PagePilot, L=Unknown, ST=Unknown, C=US"
+
+            echo "Keystore generated. Save as GitHub secret ANDROID_KEYSTORE_BASE64 for future builds."
+          fi
+
+          echo "KEYSTORE_PATH=$KEYSTORE_PATH" >> $GITHUB_ENV
+          echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_ENV
+          echo "KEY_ALIAS=$KEY_ALIAS" >> $GITHUB_ENV
+          echo "KEY_PASSWORD=$KEY_PASSWORD" >> $GITHUB_ENV
+          echo "KEYSTORE_B64=$KEYSTORE_B64" >> $GITHUB_ENV
+
+      - name: Configure Android release signing
+        run: |
+          KEYSTORE_DIR="$HOME/.android-keystore"
+          # Write key.properties for Flutter/Gradle signing.
+          cat > "$KEYSTORE_DIR/key.properties" <<EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=$KEYSTORE_DIR/release-key.jks
+          EOF
+
+          # Update android/app/build.gradle to use release signing.
+          GRADLE_FILE="android/app/build.gradle"
+          sed -i '/buildTypes {/,$d' "$GRADLE_FILE"
+
+          cat >> "$GRADLE_FILE" <<'GRADLE'
+              signingConfigs {
+                  release {
+                      storeFile file(System.getenv("HOME") + "/.android-keystore/release-key.jks")
+                      storePassword System.getenv("KEYSTORE_PASSWORD")
+                      keyAlias System.getenv("KEY_ALIAS")
+                      keyPassword System.getenv("KEY_PASSWORD")
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                  }
+              }
+          }
+          GRADLE
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Analyze code
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Build Android AAB (signed release)
+        run: flutter build appbundle --release
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-aab-${{ env.BUILD_NUMBER }}
+          path: build/app/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+      # Save keystore as artifact so the user can download it and store as a secret.
+      - name: Save keystore artifact (if newly generated)
+        if: env.KEYSTORE_B64 == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-keystore-${{ env.BUILD_NUMBER }}
+          path: /home/runner/.android-keystore/release-key.jks
+          retention-days: 90
+  # ===========================================================================
+
   # iOS Simulator Build — for testing (no Apple signing required)
   # ===========================================================================
   build-ios:

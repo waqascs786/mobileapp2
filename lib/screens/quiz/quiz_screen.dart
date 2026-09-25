@@ -2,9 +2,31 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../services/api_service.dart';
+
 // ─── Models ──────────────────────────────────────────────────────────────────
 
 enum QuestionType { trueFalse, singleChoice, multipleChoice, fillInBlank }
+
+final _htmlTags = RegExp(r'<[^>]*>');
+final _htmlEntities = {
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&#039;': "'",
+  '&hellip;': '…',
+  '&nbsp;': ' ',
+};
+
+String _stripHtml(String? html) {
+  if (html == null || html.isEmpty) return '';
+  var text = html.replaceAll(_htmlTags, ' ');
+  _htmlEntities.forEach((entity, char) {
+    text = text.replaceAll(entity, char);
+  });
+  return text.replaceAll(RegExp(r'\s+'), ' ').trim();
+}
 
 class Quiz {
   final String id;
@@ -26,17 +48,25 @@ class Quiz {
   });
 
   factory Quiz.fromJson(Map<String, dynamic> json) {
+    final rawQuestions = json['questions'] as List<dynamic>? ?? [];
+    final questions = <QuizQuestion>[];
+    for (final raw in rawQuestions) {
+      if (raw is! Map<String, dynamic>) continue;
+      final question = QuizQuestion.fromApi(raw);
+      if (question != null) questions.add(question);
+    }
+
+    final maxAttempts = (json['max_attempts'] as num?)?.toInt() ?? 0;
+    final description = _stripHtml(json['description'] as String?);
+
     return Quiz(
-      id: json['id'] as String,
-      title: json['title'] as String,
-      description: json['description'] as String?,
-      timeLimitMinutes: json['timeLimitMinutes'] as int? ?? 0,
-      passingGrade: (json['passingGrade'] as num?)?.toDouble() ?? 70.0,
-      maxAttempts: json['maxAttempts'] as int? ?? 1,
-      questions: (json['questions'] as List<dynamic>?)
-              ?.map((e) => QuizQuestion.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
+      id: json['id']?.toString() ?? '',
+      title: _stripHtml(json['title'] as String?),
+      description: description.isEmpty ? null : description,
+      timeLimitMinutes: (json['time_limit'] as num?)?.toInt() ?? 0,
+      passingGrade: (json['passing_grade'] as num?)?.toDouble() ?? 70.0,
+      maxAttempts: maxAttempts <= 0 ? 999 : maxAttempts,
+      questions: questions,
     );
   }
 }
@@ -60,23 +90,58 @@ class QuizQuestion {
     this.explanation,
   });
 
-  factory QuizQuestion.fromJson(Map<String, dynamic> json) {
+  /// Parses a question from the app API. Returns null for question shapes the
+  /// app cannot render (e.g. informational content questions).
+  static QuizQuestion? fromApi(Map<String, dynamic> json) {
+    final rawType = (json['type'] ?? '').toString();
+    final options = <QuizOption>[];
+    for (final raw in json['options'] as List<dynamic>? ?? const []) {
+      if (raw is! Map<String, dynamic>) continue;
+      final text = _stripHtml(raw['title'] as String?);
+      options.add(QuizOption(id: raw['id']?.toString() ?? '', text: text));
+    }
+    options.removeWhere((o) => o.id.isEmpty && o.text.isEmpty);
+
+    QuestionType type;
+    switch (rawType) {
+      case 'multi_choice':
+      case 'multiple_choice':
+      case 'multipleChoice':
+        if (options.isEmpty) return null;
+        type = QuestionType.multipleChoice;
+        break;
+      case 'true_false':
+      case 'trueFalse':
+        type = QuestionType.trueFalse;
+        break;
+      case 'fill_blank':
+      case 'fillInBlank':
+      case 'short_answer':
+        type = QuestionType.fillInBlank;
+        break;
+      case 'content':
+        return null;
+      case 'choice':
+      case 'picture_choice':
+      case 'single_choice':
+      case 'singleChoice':
+      default:
+        if (options.isEmpty) return null;
+        type = QuestionType.singleChoice;
+        break;
+    }
+
+    final text = _stripHtml(json['title'] as String?);
+    final content = _stripHtml(json['content'] as String?);
+
     return QuizQuestion(
-      id: json['id'] as String,
-      text: json['text'] as String,
-      type: QuestionType.values.firstWhere(
-        (e) => e.name == json['type'],
-        orElse: () => QuestionType.singleChoice,
-      ),
-      options: (json['options'] as List<dynamic>?)
-              ?.map((e) => QuizOption.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
-      correctAnswer: json['correctAnswer'] as String?,
-      correctAnswers: (json['correctAnswers'] as List<dynamic>?)
-          ?.map((e) => e as String)
-          .toList(),
-      explanation: json['explanation'] as String?,
+      id: json['id'].toString(),
+      text: content.isEmpty ? text : '$text\n$content',
+      type: type,
+      options: options,
+      explanation: json['explanation'] != null
+          ? _stripHtml(json['explanation'] as String?)
+          : null,
     );
   }
 }
@@ -135,7 +200,10 @@ class QuizProvider extends ChangeNotifier {
   bool _isQuizStarted = false;
   bool _isQuizFinished = false;
   bool _isLoading = false;
+  bool _isSubmitting = false;
   String? _error;
+  String? _submitError;
+  QuizResult? _lastResult;
 
   Quiz? get quiz => _quiz;
   int get currentQuestionIndex => _currentQuestionIndex;
@@ -143,7 +211,12 @@ class QuizProvider extends ChangeNotifier {
   bool get isQuizStarted => _isQuizStarted;
   bool get isQuizFinished => _isQuizFinished;
   bool get isLoading => _isLoading;
+  bool get isSubmitting => _isSubmitting;
   String? get error => _error;
+  String? get submitError => _submitError;
+  QuizResult? get lastResult => _lastResult;
+  int get attemptsRemaining => _attemptsRemaining;
+  bool get canStart => _quiz != null && _quiz!.questions.isNotEmpty && _attemptsRemaining > 0;
 
   QuizQuestion? get currentQuestion =>
       _quiz?.questions[_currentQuestionIndex];
@@ -165,16 +238,25 @@ class QuizProvider extends ChangeNotifier {
   Future<void> loadQuiz(String quizId) async {
     _isLoading = true;
     _error = null;
+    _submitError = null;
     notifyListeners();
 
     try {
-      // TODO: Replace with actual API call
-      // final response = await http.get(Uri.parse('$apiBase/quizzes/$quizId'));
-      // _quiz = Quiz.fromJson(jsonDecode(response.body));
+      final data = await ApiService.instance.getQuiz(quizId);
+      final quiz = Quiz.fromJson(data);
+      if (quiz.questions.isEmpty) {
+        _error = 'This quiz has no questions yet.';
+      }
+      _quiz = quiz;
 
-      _quiz = _getDemoQuiz();
-      _attemptsRemaining = _quiz!.maxAttempts;
-    } catch (e) {
+      final usedAttempts = (data['attempts'] as num?)?.toInt() ?? 0;
+      final remaining = quiz.maxAttempts - usedAttempts;
+      _attemptsRemaining = quiz.maxAttempts >= 999
+          ? 999
+          : (remaining < 0 ? 0 : remaining);
+    } on ApiException catch (e) {
+      _error = e.message;
+    } catch (_) {
       _error = 'Failed to load quiz';
     } finally {
       _isLoading = false;
@@ -194,7 +276,7 @@ class QuizProvider extends ChangeNotifier {
         _timeRemainingSeconds--;
         if (_timeRemainingSeconds <= 0) {
           _timer?.cancel();
-          submitQuiz();
+          unawaited(submitQuiz());
         }
         notifyListeners();
       });
@@ -228,58 +310,73 @@ class QuizProvider extends ChangeNotifier {
     }
   }
 
-  QuizResult submitQuiz() {
+  Future<void> submitQuiz() async {
+    if (_isSubmitting || _quiz == null || _isQuizFinished) return;
+    _isSubmitting = true;
+    _submitError = null;
     _timer?.cancel();
-    _isQuizFinished = true;
-    _attemptsRemaining--;
-
-    int correct = 0;
-    final results = <QuestionResult>[];
-
-    for (int i = 0; i < _quiz!.questions.length; i++) {
-      final question = _quiz!.questions[i];
-      final userAnswer = _answers[i];
-      bool isCorrect = false;
-
-      switch (question.type) {
-        case QuestionType.trueFalse:
-        case QuestionType.fillInBlank:
-          isCorrect = userAnswer?.toString().toLowerCase().trim() ==
-              question.correctAnswer?.toLowerCase().trim();
-          break;
-        case QuestionType.singleChoice:
-          isCorrect = userAnswer == question.correctAnswer;
-          break;
-        case QuestionType.multipleChoice:
-          if (userAnswer is List<String> && question.correctAnswers != null) {
-            final sorted = List<String>.from(userAnswer)..sort();
-            final correctSorted =
-                List<String>.from(question.correctAnswers!)..sort();
-            isCorrect = sorted.toString() == correctSorted.toString();
-          }
-          break;
-      }
-
-      if (isCorrect) correct++;
-      results.add(QuestionResult(
-        question: question,
-        userAnswer: userAnswer,
-        isCorrect: isCorrect,
-      ));
-    }
-
-    final score =
-        _quiz!.questions.isEmpty ? 0.0 : (correct / _quiz!.questions.length) * 100;
-
     notifyListeners();
 
-    return QuizResult(
-      totalQuestions: _quiz!.questions.length,
-      correctAnswers: correct,
-      score: score,
-      passed: score >= _quiz!.passingGrade,
-      questionResults: results,
-    );
+    try {
+      final payload = <String, dynamic>{};
+      for (int i = 0; i < _quiz!.questions.length; i++) {
+        final question = _quiz!.questions[i];
+        final answer = _answers[i];
+        if (answer == null) continue;
+        if (question.type == QuestionType.multipleChoice) {
+          payload[question.id] = answer is List
+              ? answer.map((e) => e.toString()).toList()
+              : [answer.toString()];
+        } else {
+          payload[question.id] = answer.toString();
+        }
+      }
+
+      final data =
+          await ApiService.instance.submitQuizAnswers(_quiz!.id, payload);
+
+      final serverResults = <String, Map<String, dynamic>>{};
+      for (final raw in data['results'] as List<dynamic>? ?? const []) {
+        if (raw is! Map<String, dynamic>) continue;
+        serverResults[raw['question_id'].toString()] = raw;
+      }
+
+      int correct = 0;
+      final results = <QuestionResult>[];
+      for (int i = 0; i < _quiz!.questions.length; i++) {
+        final question = _quiz!.questions[i];
+        final serverResult = serverResults[question.id];
+        final isCorrect = serverResult?['is_correct'] == true;
+        if (isCorrect) correct++;
+        results.add(QuestionResult(
+          question: question,
+          userAnswer: _answers[i],
+          isCorrect: isCorrect,
+        ));
+      }
+
+      final attemptNumber = (data['attempt_number'] as num?)?.toInt() ?? 0;
+      if (_quiz!.maxAttempts < 999) {
+        final remaining = _quiz!.maxAttempts - attemptNumber;
+        _attemptsRemaining = remaining < 0 ? 0 : remaining;
+      }
+
+      _lastResult = QuizResult(
+        totalQuestions: _quiz!.questions.length,
+        correctAnswers: correct,
+        score: (data['percentage'] as num?)?.toDouble() ?? 0.0,
+        passed: data['passed'] == true,
+        questionResults: results,
+      );
+      _isQuizFinished = true;
+    } on ApiException catch (e) {
+      _submitError = e.message;
+    } catch (_) {
+      _submitError = 'Failed to submit quiz. Please try again.';
+    } finally {
+      _isSubmitting = false;
+      notifyListeners();
+    }
   }
 
   void retryQuiz() {
@@ -289,6 +386,8 @@ class QuizProvider extends ChangeNotifier {
       _currentQuestionIndex = 0;
       _answers.clear();
       _timeRemainingSeconds = 0;
+      _submitError = null;
+      _lastResult = null;
       _timer?.cancel();
       notifyListeners();
     }
@@ -298,73 +397,6 @@ class QuizProvider extends ChangeNotifier {
   void dispose() {
     _timer?.cancel();
     super.dispose();
-  }
-
-  static Quiz _getDemoQuiz() {
-    return const Quiz(
-      id: 'q1',
-      title: 'Flutter Fundamentals Quiz',
-      description: 'Test your knowledge of Flutter basics. You have 10 minutes to complete this quiz.',
-      timeLimitMinutes: 10,
-      passingGrade: 70.0,
-      maxAttempts: 3,
-      questions: [
-        QuizQuestion(
-          id: 'q1',
-          text: 'Flutter is developed by Google.',
-          type: QuestionType.trueFalse,
-          correctAnswer: 'true',
-          explanation: 'Flutter is an open-source UI toolkit developed by Google for building natively compiled applications for mobile, web, and desktop.',
-        ),
-        QuizQuestion(
-          id: 'q2',
-          text: 'Which widget is used to display content that can scroll?',
-          type: QuestionType.singleChoice,
-          options: [
-            QuizOption(id: 'a', text: 'Container'),
-            QuizOption(id: 'b', text: 'Column'),
-            QuizOption(id: 'c', text: 'ListView'),
-            QuizOption(id: 'd', text: 'Row'),
-          ],
-          correctAnswer: 'c',
-          explanation: 'ListView is a scrollable list of widgets arranged linearly. For scrollable content, ListView and SingleChildScrollView are commonly used.',
-        ),
-        QuizQuestion(
-          id: 'q3',
-          text: 'Which of the following are Flutter layout widgets? (Select all that apply)',
-          type: QuestionType.multipleChoice,
-          options: [
-            QuizOption(id: 'a', text: 'Row'),
-            QuizOption(id: 'b', text: 'Text'),
-            QuizOption(id: 'c', text: 'Column'),
-            QuizOption(id: 'd', text: 'Stack'),
-            QuizOption(id: 'e', text: 'Icon'),
-          ],
-          correctAnswers: ['a', 'c', 'd'],
-          explanation: 'Row, Column, and Stack are layout widgets. Text and Icon are leaf widgets that display content.',
-        ),
-        QuizQuestion(
-          id: 'q4',
-          text: 'The function used to launch a new Flutter app is called ___.',
-          type: QuestionType.fillInBlank,
-          correctAnswer: 'runapp',
-          explanation: 'The main() function calls runApp() which takes a Widget and makes it the root of the widget tree.',
-        ),
-        QuizQuestion(
-          id: 'q5',
-          text: 'What is the name of Flutter\'s programming language?',
-          type: QuestionType.singleChoice,
-          options: [
-            QuizOption(id: 'a', text: 'Kotlin'),
-            QuizOption(id: 'b', text: 'Dart'),
-            QuizOption(id: 'c', text: 'Java'),
-            QuizOption(id: 'd', text: 'Swift'),
-          ],
-          correctAnswer: 'b',
-          explanation: 'Flutter uses Dart as its programming language. Dart is also developed by Google.',
-        ),
-      ],
-    );
   }
 }
 
@@ -430,6 +462,52 @@ class _QuizScreenState extends State<QuizScreen> {
               FilledButton(
                 onPressed: () => _provider.loadQuiz(widget.quizId),
                 child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_provider.isSubmitting) {
+      return Scaffold(
+        appBar: AppBar(title: Text(widget.courseTitle)),
+        body: const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Submitting your answers...'),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_provider.submitError != null && !_provider.isQuizFinished) {
+      return Scaffold(
+        appBar: AppBar(title: Text(widget.courseTitle)),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.cloud_off, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Text(_provider.submitError!, textAlign: TextAlign.center),
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: () => _provider.submitQuiz(),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry Submit'),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Back to Course'),
               ),
             ],
           ),
@@ -515,16 +593,26 @@ class _QuizStartScreen extends StatelessWidget {
               const SizedBox(height: 12),
               _InfoCard(
                 icon: Icons.replay,
-                label: 'Max Attempts',
-                value: '${quiz.maxAttempts}',
+                label: quiz.maxAttempts >= 999
+                    ? 'Attempts'
+                    : 'Attempts Left',
+                value: quiz.maxAttempts >= 999
+                    ? 'Unlimited'
+                    : '${provider.attemptsRemaining} of ${quiz.maxAttempts}',
               ),
               const SizedBox(height: 40),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: provider.startQuiz,
+                  onPressed: provider.canStart ? provider.startQuiz : null,
                   icon: const Icon(Icons.play_arrow),
-                  label: const Text('Start Quiz'),
+                  label: Text(
+                    provider.canStart
+                        ? 'Start Quiz'
+                        : provider.attemptsRemaining <= 0
+                            ? 'No Attempts Remaining'
+                            : 'Start Quiz',
+                  ),
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     textStyle: const TextStyle(fontSize: 16),
@@ -833,7 +921,7 @@ class _QuizPlayScreen extends StatelessWidget {
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
-              provider.submitQuiz();
+              unawaited(provider.submitQuiz());
             },
             child: const Text('Submit'),
           ),
@@ -863,6 +951,7 @@ class _AnswerWidget extends StatelessWidget {
     switch (question.type) {
       case QuestionType.trueFalse:
         return _TrueFalseAnswer(
+          options: question.options,
           selectedValue: selectedAnswer,
           onAnswer: onAnswer,
         );
@@ -888,29 +977,40 @@ class _AnswerWidget extends StatelessWidget {
 }
 
 class _TrueFalseAnswer extends StatelessWidget {
-  final String? selectedValue;
-  final ValueChanged<String> onAnswer;
+  final List<QuizOption> options;
+  final dynamic selectedValue;
+  final ValueChanged<dynamic> onAnswer;
 
-  const _TrueFalseAnswer({this.selectedValue, required this.onAnswer});
+  const _TrueFalseAnswer({
+    this.options = const [],
+    this.selectedValue,
+    required this.onAnswer,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final hasApiOptions = options.length >= 2;
+    final trueLabel = hasApiOptions ? options[0].text : 'True';
+    final falseLabel = hasApiOptions ? options[1].text : 'False';
+    final trueValue = hasApiOptions ? options[0].id : 'true';
+    final falseValue = hasApiOptions ? options[1].id : 'false';
+
     return Row(
       children: [
         Expanded(
           child: _SelectionTile(
-            label: 'True',
-            isSelected: selectedValue == 'true',
-            onTap: () => onAnswer('true'),
+            label: trueLabel,
+            isSelected: selectedValue == trueValue,
+            onTap: () => onAnswer(trueValue),
             color: Colors.green,
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: _SelectionTile(
-            label: 'False',
-            isSelected: selectedValue == 'false',
-            onTap: () => onAnswer('false'),
+            label: falseLabel,
+            isSelected: selectedValue == falseValue,
+            onTap: () => onAnswer(falseValue),
             color: Colors.red,
           ),
         ),
@@ -1127,7 +1227,7 @@ class _QuizResultScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final result = provider.submitQuiz();
+    final result = provider.lastResult!;
 
     return Scaffold(
       appBar: AppBar(

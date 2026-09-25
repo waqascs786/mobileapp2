@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_html/flutter_html.dart';
 import '../../config/app_config.dart';
 import '../../models/course.dart';
 import '../../services/api_service.dart';
@@ -19,18 +20,15 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   Course? _course;
-  List<dynamic> _reviews = [];
   bool _isLoading = true;
-  bool _isLoadingReviews = true;
   bool _isWishlisted = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     _loadCourseDetail();
-    _loadReviews();
   }
 
   @override
@@ -65,17 +63,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
         _error = 'Failed to load course details. Please try again.';
         _isLoading = false;
       });
-    }
-  }
-
-  Future<void> _loadReviews() async {
-    setState(() => _isLoadingReviews = true);
-    try {
-      final reviews = await ApiService.instance.getCourseReviews(int.tryParse(widget.courseId) ?? 0);
-      if (mounted) setState(() => _reviews = reviews);
-    } catch (_) {
-    } finally {
-      if (mounted) setState(() => _isLoadingReviews = false);
     }
   }
 
@@ -224,7 +211,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
             Text(
               isFree
                   ? 'Start learning for free!'
-                  : 'You will be charged \$${price.toStringAsFixed(2)}',
+                  : 'Price: \$${price.toStringAsFixed(2)}',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
@@ -244,7 +231,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: Text(isFree ? 'Enroll Now' : 'Proceed to Payment'),
+                child: const Text('Enroll Now'),
               ),
             ),
             const SizedBox(height: 12),
@@ -303,7 +290,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                       _error = null;
                     });
                     _loadCourseDetail();
-                    _loadReviews();
                   },
                   child: const Text('Retry'),
                 ),
@@ -339,7 +325,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
               ElevatedButton(
                 onPressed: () {
                   _loadCourseDetail();
-                  _loadReviews();
                 },
                 child: const Text('Retry'),
               ),
@@ -372,7 +357,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                 children: [
                   _buildCurriculumTab(course, config),
                   _buildOverviewTab(course, config),
-                  _buildReviewsTab(config),
                 ],
               ),
             ),
@@ -571,7 +555,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
         tabs: const [
           Tab(text: 'Curriculum'),
           Tab(text: 'Overview'),
-          Tab(text: 'Reviews'),
         ],
       ),
     );
@@ -619,13 +602,42 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
               ),
             ),
             const SizedBox(height: 12),
-            Text(
-              course.description,
-              style: TextStyle(
-                fontSize: 15,
-                height: 1.6,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-              ),
+            Html(
+              data: course.description,
+              style: {
+                "body": Style(
+                  fontSize: FontSize(15),
+                  lineHeight: LineHeight.number(1.6),
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                  margin: Margins.zero,
+                  padding: HtmlPaddings.zero,
+                ),
+                "p": Style(
+                  fontSize: FontSize(15),
+                  lineHeight: LineHeight.number(1.6),
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                  margin: Margins.only(bottom: 12),
+                ),
+                "ul": Style(margin: Margins.only(left: 16, bottom: 12)),
+                "ol": Style(margin: Margins.only(left: 16, bottom: 12)),
+                "li": Style(fontSize: FontSize(15), lineHeight: LineHeight.number(1.5)),
+                "h1": Style(fontSize: FontSize(20), fontWeight: FontWeight.bold),
+                "h2": Style(fontSize: FontSize(18), fontWeight: FontWeight.bold),
+                "h3": Style(fontSize: FontSize(16), fontWeight: FontWeight.bold),
+                "a": Style(color: config.primaryColor, textDecoration: TextDecoration.underline),
+                "strong": Style(fontWeight: FontWeight.bold),
+                "b": Style(fontWeight: FontWeight.bold),
+                "img": Style(margin: Margins.only(top: 8, bottom: 8)),
+                "blockquote": Style(
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                  fontStyle: FontStyle.italic,
+                  margin: Margins.only(left: 8),
+                  border: Border(
+                    left: BorderSide(color: config.primaryColor, width: 3),
+                  ),
+                  padding: HtmlPaddings.only(left: 12),
+                ),
+              },
             ),
             const SizedBox(height: 24),
           ],
@@ -693,210 +705,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
             ),
           ],
           const SizedBox(height: 80),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildReviewsTab(AppConfig config) {
-    if (_isLoadingReviews) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_reviews.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.rate_review_outlined, size: 64, color: Colors.grey.shade300),
-            const SizedBox(height: 16),
-            Text(
-              'No reviews yet',
-              style: TextStyle(
-                fontSize: 16,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final avgRating = _reviews.isEmpty
-        ? 0.0
-        : _reviews.map((r) => (r['rating'] as num?)?.toDouble() ?? 0.0).reduce((a, b) => a + b) / _reviews.length;
-    final ratingCounts = List.generate(5, (i) {
-      return _reviews.where((r) => (r['rating'] as num?)?.toInt() == 5 - i).length;
-    });
-    final totalReviews = _reviews.length;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildRatingSummary(avgRating, ratingCounts, totalReviews, config),
-          const SizedBox(height: 24),
-          ..._reviews.map((review) => _buildReviewCard(review, config)),
-          const SizedBox(height: 80),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRatingSummary(double avg, List<int> counts, int total, AppConfig config) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Column(
-          children: [
-            Text(
-              avg.toStringAsFixed(1),
-              style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: List.generate(
-                5,
-                (i) => Icon(
-                  i < avg.round() ? Icons.star_rounded : Icons.star_border_rounded,
-                  color: Colors.amber,
-                  size: 20,
-                ),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '$total reviews',
-              style: TextStyle(
-                fontSize: 13,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(width: 24),
-        Expanded(
-          child: Column(
-            children: List.generate(5, (i) {
-              final starCount = counts[i];
-              final fraction = total > 0 ? starCount / total : 0.0;
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 32,
-                      child: Text(
-                        '${5 - i}',
-                        textAlign: TextAlign.right,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: fraction,
-                          backgroundColor: Colors.grey.shade200,
-                          valueColor: AlwaysStoppedAnimation<Color>(config.primaryColor),
-                          minHeight: 6,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      width: 24,
-                      child: Text(
-                        '$starCount',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildReviewCard(dynamic review, AppConfig config) {
-    final userName = review['userName'] as String? ?? 'Anonymous';
-    final rating = (review['rating'] as num?)?.toInt() ?? 0;
-    final comment = review['comment'] as String? ?? '';
-    final date = review['date'] as String? ?? '';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: config.primaryColor.withOpacity(0.1),
-                child: Text(
-                  userName.initials,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: config.primaryColor,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      userName,
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      date,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Row(
-                children: List.generate(
-                  5,
-                  (i) => Icon(
-                    i < rating ? Icons.star_rounded : Icons.star_border_rounded,
-                    color: Colors.amber,
-                    size: 16,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            comment,
-            style: TextStyle(
-              fontSize: 14,
-              height: 1.5,
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-            ),
-          ),
         ],
       ),
     );
