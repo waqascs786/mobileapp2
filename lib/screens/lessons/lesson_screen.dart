@@ -10,6 +10,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'dart:io';
 
 import '../../services/api_service.dart';
+import '../../config/app_config.dart';
 
 // ─── Models ──────────────────────────────────────────────────────────────────
 
@@ -710,7 +711,12 @@ class _LessonScreenState extends State<LessonScreen> {
           if (lesson.videoUrl != null && lesson.videoUrl!.isNotEmpty)
             Padding(
               padding: const EdgeInsets.all(16),
-              child: _LessonVideoPlayer(url: lesson.videoUrl!),
+              // Key on lesson id so the WebView is recreated (and the new
+              // video actually loads) when navigating between lessons.
+              child: _LessonVideoPlayer(
+                key: ValueKey('lesson_video_${lesson.id}'),
+                url: lesson.videoUrl!,
+              ),
             ),
 
           // HTML content
@@ -896,7 +902,7 @@ class _LessonScreenState extends State<LessonScreen> {
 class _LessonVideoPlayer extends StatefulWidget {
   final String url;
 
-  const _LessonVideoPlayer({required this.url});
+  const _LessonVideoPlayer({super.key, required this.url});
 
   @override
   State<_LessonVideoPlayer> createState() => _LessonVideoPlayerState();
@@ -904,23 +910,79 @@ class _LessonVideoPlayer extends StatefulWidget {
 
 class _LessonVideoPlayerState extends State<_LessonVideoPlayer> {
   late final WebViewController _webController;
-  String? _embedUrl;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _embedUrl = _buildEmbedUrl(widget.url);
+    _webController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.black);
+    _loadVideo(widget.url);
+  }
 
-    if (_embedUrl == null) {
+  @override
+  void didUpdateWidget(covariant _LessonVideoPlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url) {
+      _loadVideo(widget.url);
+    }
+  }
+
+  void _loadVideo(String url) {
+    final embedUrl = _buildEmbedUrl(url);
+
+    if (embedUrl == null) {
       _error = 'Unsupported video format';
       return;
     }
+    _error = null;
 
-    _webController = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.black)
-      ..loadRequest(Uri.parse(_embedUrl!));
+    if (embedUrl.contains('youtube.com/embed/')) {
+      // YouTube rejects embeds without a Referer header (Error 153).
+      // Loading a wrapper page with an iframe — instead of navigating the
+      // WebView straight to the embed URL — makes the request carry the
+      // site URL as referrer, which YouTube accepts.
+      _webController.loadHtmlString(
+        _buildYouTubeWrapper(embedUrl),
+        baseUrl: _referrerUrl(),
+      );
+    } else {
+      _webController.loadRequest(Uri.parse(embedUrl));
+    }
+  }
+
+  /// Origin used as the document URL (and thus Referer) for the YouTube
+  /// wrapper page.
+  String _referrerUrl() {
+    String site = '';
+    try {
+      site = AppConfig.instance.siteUrl;
+      if (site.isEmpty) site = AppConfig.instance.apiBaseUrl;
+    } catch (_) {}
+    site = site.trim();
+    if (site.isEmpty || !site.startsWith('http')) return 'https://www.youtube.com';
+    return site.replaceAll(RegExp(r'/+$'), '');
+  }
+
+  String _buildYouTubeWrapper(String embedUrl) {
+    final src = embedUrl.replaceAll('"', '&quot;');
+    return '''
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<style>
+  html, body { margin: 0; padding: 0; background: #000; height: 100%; overflow: hidden; }
+  iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+</style>
+</head>
+<body>
+<iframe src="$src" referrerpolicy="strict-origin" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen webkitallowfullscreen></iframe>
+</body>
+</html>''';
   }
 
   String? _buildEmbedUrl(String url) {

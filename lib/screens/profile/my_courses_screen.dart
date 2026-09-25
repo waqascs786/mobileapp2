@@ -92,11 +92,7 @@ class MyCoursesProvider extends ChangeNotifier {
               instructorName:
                   c.instructor.name.isNotEmpty ? c.instructor.name : null,
               progress: norm,
-              status: norm >= 1.0
-                  ? 'completed'
-                  : norm > 0
-                      ? 'in_progress'
-                      : 'all',
+              status: norm >= 1.0 ? 'completed' : 'in_progress',
               category: c.categories.isNotEmpty ? c.categories.first : null,
               totalLessons: c.lessonsCount,
               lastAccessedAt: null,
@@ -315,15 +311,11 @@ class _MyCoursesScreenState extends State<MyCoursesScreen>
             ),
             const SizedBox(height: 8),
             Text(
-              'Start learning by enrolling in a course',
+              'Courses you enroll in will appear here.',
+              textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
               ),
-            ),
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: () => Navigator.pushNamed(context, '/courses'),
-              child: const Text('Browse Courses'),
             ),
           ],
         ),

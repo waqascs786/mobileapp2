@@ -258,11 +258,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onTap: () => Navigator.pushNamed(context, '/my-courses'),
               ),
               _MenuItem(
-                icon: Icons.favorite_border,
-                title: 'Wishlist',
-                onTap: () => Navigator.pushNamed(context, '/wishlist'),
-              ),
-              _MenuItem(
                 icon: Icons.workspace_premium,
                 title: 'Certificates',
                 onTap: () {},

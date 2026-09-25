@@ -282,7 +282,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
             ),
             const SizedBox(height: 24),
             FilledButton(
-              onPressed: () => Navigator.pushNamed(context, '/courses'),
+              onPressed: () => Navigator.pushNamed(context, '/home'),
               child: const Text('Explore Courses'),
             ),
           ],
