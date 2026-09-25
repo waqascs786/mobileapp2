@@ -1,6 +1,6 @@
 {
-    "trigger_id": "98af24bb-c400-474e-be56-98d88e2d2d1c",
-    "platform": "android",
+    "trigger_id": "c0112f22-b778-4a61-a051-517d91214e31",
+    "platform": "aab",
     "app_name": "WP Mobile App 3",
     "package_name": "com.app3.lifterapp",
     "primary_color": "#0073aa",
