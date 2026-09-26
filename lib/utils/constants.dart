@@ -29,7 +29,6 @@ class AppConstants {
   static const String certificatesRoute = '/certificates';
   static const String progressRoute = '/progress';
   static const String loginRoute = '/login';
-  static const String registerRoute = '/register';
   static const String splashRoute = '/';
 
   static const Duration animationDuration = Duration(milliseconds: 300);

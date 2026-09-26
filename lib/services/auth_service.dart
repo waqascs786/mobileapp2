@@ -5,13 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'api_service.dart';
 import 'storage_service.dart';
 
-class AuthResult {
-  final bool isSuccess;
-  final String? errorMessage;
-
-  const AuthResult({required this.isSuccess, this.errorMessage});
-}
-
 class AuthService extends ChangeNotifier {
   static AuthService? _staticInstance;
 
@@ -119,79 +112,8 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  Future<bool> loginWithGoogle() async {
-    try {
-      _isLoading = true;
-      _error = null;
-      notifyListeners();
 
-      return false;
-    } catch (e) {
-      _error = e.toString();
-      _log('Google login failed: $e');
-      notifyListeners();
-      return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
 
-  Future<bool> loginWithFacebook() async {
-    try {
-      _isLoading = true;
-      _error = null;
-      notifyListeners();
-
-      return false;
-    } catch (e) {
-      _error = e.toString();
-      _log('Facebook login failed: $e');
-      notifyListeners();
-      return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  Future<AuthResult> register({
-    required String name,
-    required String email,
-    required String password,
-  }) async {
-    try {
-      _isLoading = true;
-      _error = null;
-      notifyListeners();
-
-      final result = await _apiService.register(
-        name: name,
-        email: email,
-        password: password,
-      );
-      if (result['success'] == true && result['data'] != null) {
-        final data = result['data'] as Map<String, dynamic>;
-        _user = data;
-        _isAuthenticated = true;
-        await _storageService.saveString('user_data', data.toString());
-      } else {
-        return AuthResult(isSuccess: false, errorMessage: result['message'] as String? ?? 'Registration failed');
-      }
-
-      notifyListeners();
-      return const AuthResult(isSuccess: true);
-    } catch (e) {
-      _error = e.toString();
-      _isAuthenticated = false;
-      _log('Registration failed: $e');
-      notifyListeners();
-      return AuthResult(isSuccess: false, errorMessage: e.toString());
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
 
   Future<void> logout() async {
     _isAuthenticated = false;

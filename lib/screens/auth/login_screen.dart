@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../config/app_config.dart';
+import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../utils/validators.dart';
 import '../../widgets/loading_overlay.dart';
 import '../home/home_screen.dart';
-import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   static const route = '/login';
@@ -66,55 +66,111 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _handleGoogleLogin() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  Future<void> _showForgotPasswordDialog(AppConfig config) async {
+    final controller = TextEditingController(text: _emailController.text.trim());
+    final formKey = GlobalKey<FormState>();
+    var sending = false;
+    var success = false;
+    String? message;
 
-    try {
-      final success = await AuthService.instance.loginWithGoogle();
-      if (!mounted) return;
-
-      if (success) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text('Reset Password', style: TextStyle(fontSize: 18)),
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Enter your email or username and we'll send you a password reset link.",
+                      style: TextStyle(fontSize: 13),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: controller,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: InputDecoration(
+                        labelText: 'Email or username',
+                        prefixIcon: const Icon(Icons.email_outlined),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        isDense: true,
+                      ),
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Email or username is required' : null,
+                    ),
+                    if (message != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        message!,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: success ? Colors.green.shade700 : Colors.red.shade700,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: sending ? null : () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: sending
+                      ? null
+                      : () async {
+                          if (!(formKey.currentState?.validate() ?? false)) return;
+                          setDialogState(() {
+                            sending = true;
+                            message = null;
+                          });
+                          try {
+                            final res = await ApiService.instance
+                                .forgotPassword(email: controller.text.trim());
+                            setDialogState(() {
+                              sending = false;
+                              success = res['success'] == true;
+                              message = res['message'] as String? ??
+                                  'Password reset link sent. Check your email.';
+                            });
+                          } catch (e) {
+                            setDialogState(() {
+                              sending = false;
+                              success = false;
+                              message = e is ApiException
+                                  ? e.message
+                                  : 'Something went wrong. Please try again.';
+                            });
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: config.primaryColor,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: sending
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Text('Send Link'),
+                ),
+              ],
+            );
+          },
         );
-      } else {
-        setState(() => _errorMessage = 'Google sign-in was cancelled.');
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _errorMessage = 'Google sign-in failed. Please try again.');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _handleFacebookLogin() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final success = await AuthService.instance.loginWithFacebook();
-      if (!mounted) return;
-
-      if (success) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
-      } else {
-        setState(() => _errorMessage = 'Facebook sign-in was cancelled.');
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _errorMessage = 'Facebook sign-in failed. Please try again.');
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+      },
+    );
   }
 
   @override
@@ -145,15 +201,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   _buildForgotPasswordLink(config),
                   const SizedBox(height: 24),
                   _buildLoginButton(config),
-                  if (config.enableGoogleLogin || config.enableFacebookLogin) ...[
-                    const SizedBox(height: 24),
-                    _buildDivider(),
-                    const SizedBox(height: 24),
-                    _buildSocialButtons(config),
-                  ],
                   const SizedBox(height: 32),
-                  _buildRegisterLink(context),
-                  const SizedBox(height: 24),
                 ],
               ),
             ),
@@ -276,12 +324,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return Align(
       alignment: Alignment.centerRight,
       child: TextButton(
-        onPressed: () {
-          final url = '${config.wpBaseUrl}/wp-login.php?action=lostpassword';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Opening password reset: $url')),
-          );
-        },
+        onPressed: () => _showForgotPasswordDialog(config),
         child: Text(
           'Forgot Password?',
           style: TextStyle(
@@ -318,106 +361,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 'Login',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
-      ),
-    );
-  }
-
-  Widget _buildDivider() {
-    return Row(
-      children: [
-        const Expanded(child: Divider(thickness: 0.5)),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            'OR',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        const Expanded(child: Divider(thickness: 0.5)),
-      ],
-    );
-  }
-
-  Widget _buildSocialButtons(AppConfig config) {
-    return Row(
-      children: [
-        if (config.enableGoogleLogin)
-          Expanded(
-            child: _SocialButton(
-              icon: Icons.g_mobiledata,
-              label: 'Google',
-              onPressed: _handleGoogleLogin,
-            ),
-          ),
-        if (config.enableGoogleLogin && config.enableFacebookLogin)
-          const SizedBox(width: 16),
-        if (config.enableFacebookLogin)
-          Expanded(
-            child: _SocialButton(
-              icon: Icons.facebook,
-              label: 'Facebook',
-              onPressed: _handleFacebookLogin,
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildRegisterLink(BuildContext context) {
-    final config = AppConfig.of(context);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          "Don't have an account? ",
-          style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
-        ),
-        GestureDetector(
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const RegisterScreen()),
-            );
-          },
-          child: Text(
-            'Register',
-            style: TextStyle(
-              color: config.primaryColor,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SocialButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onPressed;
-
-  const _SocialButton({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 22),
-      label: Text(label, style: const TextStyle(fontSize: 14)),
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        side: BorderSide(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
-        ),
       ),
     );
   }

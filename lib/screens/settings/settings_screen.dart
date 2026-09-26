@@ -280,7 +280,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _SettingsTile(
             icon: Icons.person_outline,
             title: 'Developer',
-            subtitle: 'PagePilot Team',
+            subtitle: 'LifterMobileApp Team',
           ),
           _SettingsTile(
             icon: Icons.code,
@@ -288,7 +288,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => showLicensePage(
               context: context,
-              applicationName: 'PagePilot',
+              applicationName: 'LifterMobileApp',
               applicationVersion: '1.0.0',
             ),
           ),

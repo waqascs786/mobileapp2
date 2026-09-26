@@ -258,15 +258,15 @@ class ApiService {
   }
 
   Future<List<Course>> getEnrolledCourses() async {
-    try {
-      final result = await get('enrolledCourses');
-      final list = result['data'] as List<dynamic>? ?? [];
-      return list
-          .map((e) => Course.fromJson(e as Map<String, dynamic>))
-          .toList();
-    } catch (_) {
-      return [];
-    }
+    final result = await get('enrolledCourses');
+    final list = result['data'] as List<dynamic>? ?? [];
+    return list
+        .map((e) => Course.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<Map<String, dynamic>> forgotPassword({required String email}) async {
+    return post('forgotPassword', body: {'email': email});
   }
 
   Future<Map<String, dynamic>> getCourseDetail(int courseId) async {
@@ -347,40 +347,6 @@ class ApiService {
     return result;
   }
 
-  Future<Map<String, dynamic>> register({
-    required String name,
-    required String email,
-    required String password,
-  }) async {
-    final nameParts = name.split(' ');
-    final firstName = nameParts.first;
-    final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
-    final result = await post('register', body: {
-      'username': email.split('@').first,
-      'email': email,
-      'password': password,
-      'first_name': firstName,
-      'last_name': lastName,
-    });
-
-    if (result['success'] == true && result['data'] != null) {
-      final data = result['data'] as Map<String, dynamic>;
-      final token = data['token'] as String?;
-      final userId = data['id']?.toString();
-      final username = data['username'] as String?;
-      if (token != null) {
-        await _storageService.saveString('auth_token', token);
-      }
-      if (userId != null) {
-        await _storageService.saveString('user_id', userId);
-      }
-      if (username != null) {
-        await _storageService.saveString('username', username);
-      }
-    }
-
-    return result;
-  }
 
   Future<void> logout() async {
     await _storageService.remove('auth_token');

@@ -7,7 +7,6 @@ class ApiConfig {
 
   static const Map<String, String> endpoints = {
     'auth': '/pagepilot/v1/app/auth/login',
-    'register': '/pagepilot/v1/app/auth/register',
     'forgotPassword': '/pagepilot/v1/app/auth/forgot-password',
     'profile': '/pagepilot/v1/app/student/profile',
     'enrolledCourses': '/pagepilot/v1/app/student/enrolled-courses',

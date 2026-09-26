@@ -93,7 +93,7 @@ class AppConfig {
 
   factory AppConfig.fromJson(Map<String, dynamic> json) {
     return AppConfig._(
-      appName: json['appName'] as String? ?? 'PagePilot',
+      appName: json['appName'] as String? ?? 'LifterMobileApp',
       packageName: json['packageName'] as String? ?? 'com.pagepilot.app',
       primaryColor: _parseColor(json['primaryColor'] as String? ?? '#6C63FF'),
       secondaryColor: _parseColor(json['secondaryColor'] as String? ?? '#FF6584'),

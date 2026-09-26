@@ -7,7 +7,6 @@ import 'theme/app_theme.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/auth/login_screen.dart';
-import 'screens/auth/register_screen.dart';
 import 'screens/courses/course_detail_screen.dart';
 import 'screens/lessons/lesson_screen.dart';
 import 'screens/quiz/quiz_screen.dart';
@@ -37,7 +36,6 @@ class PagePilotApp extends StatelessWidget {
             SplashScreen.route: (_) => const SplashScreen(),
             HomeScreen.route: (_) => const HomeScreen(),
             LoginScreen.route: (_) => const LoginScreen(),
-            RegisterScreen.route: (_) => const RegisterScreen(),
             ProfileScreen.route: (_) => const ProfileScreen(),
             WishlistScreen.route: (_) => const WishlistScreen(),
             SettingsScreen.route: (_) => const SettingsScreen(),
